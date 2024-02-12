@@ -1,11 +1,25 @@
-from ubuntu:22.04
+FROM python as builder
+ARG DEBIAN_FRONTEND=noninteractive
 
-workdir /app
+WORKDIR /app
 
-RUN apt update -y && apt install -y build-essential pkg-config meson cmake g++
+RUN apt update -y && apt install -y git cmake g++ libboost-dev \
+    libboost-context-dev libboost-stacktrace-dev nlohmann-json3-dev
+RUN pip install meson ninja
 
-COPY . .
+COPY subprojects/simgrid.wrap subprojects/simgrid.wrap
+COPY meson.build meson.build
+COPY src src
 
-#RUN meson subproyects download
-#RUN meson setup build
-#RUN cd build && meson compile
+RUN meson subprojects download
+RUN meson setup build
+RUN cd build && meson compile
+
+FROM ubuntu:22.04
+
+WORKDIR /app
+
+COPY --from=builder /app/build /app
+
+RUN apt update -y && apt install -y libboost-dev \ 
+    libboost-context-dev libboost-stacktrace-dev nlohmann-json3-dev

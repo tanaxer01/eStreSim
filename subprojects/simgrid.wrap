@@ -1,6 +1,6 @@
 [wrap-git]
-url = https://github.com/simgrid/simgrid
-revision = head
+url = https://framagit.org/simgrid/simgrid
+revision = master
 depth = 1
 method = cmake
 
