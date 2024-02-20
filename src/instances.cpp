@@ -20,9 +20,10 @@ int main(int argc, char *argv[]) {
     auto B1 = sg4::ExecTask::init("rollCount", PM0->get_speed(), PM1);
     B1->set_parallelism_degree(3);
 
-    // TODO: Por defecto siempre elige la instancia 0, habría que implementar las distintas
+    // TODO: Por defecto siempre elige la instancia 0, habría que implementar
+    // las distintas
     //       funcionalidades que permite storm.j
-    B1->set_load_balancing_function([]() { return "instance 0"; });
+    B1->set_load_balancing_function([]() { return "instance_0"; });
 
     auto B2 = sg4::ExecTask::init("IR", PM0->get_speed(), PM1);
     B2->set_parallelism_degree(2);
