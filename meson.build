@@ -13,6 +13,7 @@ if not simgrid.found()
   simgrid = simgrid_proj.get_variable('simgrid_dep')
 endif
 
+executable('workflow', ['src/workflow.cpp'], dependencies: [simgrid, boost])
 executable('workloads', ['src/workloads.cpp'], dependencies: [simgrid, boost])
 executable('instances', ['src/instances.cpp'], dependencies: [simgrid, boost])
 
