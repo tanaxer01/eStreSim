@@ -5,15 +5,17 @@ project('stream_sim', 'cpp',
   meson_version: '>=0.40.0'
 )
 
-simgrid = dependency('simgrid')
+simgrid = dependency('simgrid', required : false)
 boost   = dependency('boost')
 
 if not simgrid.found()
+  message('TEST')
   simgrid_project = subproject('simgrid')
-  simgrid = simgrid_proj.get_variable('simgrid_dep')
+  simgrid = simgrid_project.get_variable('simgrid_dep')
 endif
 
-executable('workflow', ['src/workflow.cpp'], dependencies: [simgrid, boost])
-executable('workloads', ['src/workloads.cpp'], dependencies: [simgrid, boost])
-executable('instances', ['src/instances.cpp'], dependencies: [simgrid, boost])
+
+# executable('workflow', ['src/workflow.cpp'], dependencies: [simgrid, boost])
+# executable('workloads', ['src/workloads.cpp'], dependencies: [simgrid, boost])
+# executable('instances', ['src/instances.cpp'], dependencies: [simgrid, boost])
 
