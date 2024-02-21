@@ -27,29 +27,56 @@ class Workflow {
         // Just plain ol' round robin
         int count = 0;
         for (auto t : tasks) {
-            this->tasks.push_back(sg4::ExecTask::init(t.name, t.amount, hosts[count]));
-            count = (count + 1 < hosts.size()) ? count + 1 : 0;
+            add_task(t.name, t.amount, t.instances, hosts[count]);
+            count = (count + 1 < (int)hosts.size()) ? count + 1 : 0;
         }
 
-        std::string name;
-        sg4::CommTaskPtr comm;
-        sg4::ExecTaskPtr src, dst;
         for (auto l : links) {
-            src = this->task_by_name(l.src);
-            dst = this->task_by_name(l.dst);
-            name = l.src + "_" + l.dst;
+            this->add_link(l.src, l.dst, l.amount);
+        }
 
-            comm = sg4::CommTask::init(name, 0, src->get_host(), dst->get_host());
-            src->add_successor(comm);
-            comm->add_successor(dst);
-            this->links.push_back(comm);
+        for (auto t : this->tasks) {
+            for (auto l : t->get_successors()) {
+                XBT_INFO("%s %s", t->get_cname(), l->get_cname());
+            }
         }
     };
 
-    void new_task(const std::string name, double amount, int paralelism_degree) {}
+    void add_task(const std::string name, double amount, int paralelism_degree, sg4::Host *h) {
+        this->tasks.push_back(sg4::ExecTask::init(name, amount, h));
+    }
 
-    void rmv_task(int task_id) {}
-    void mov_task(int task_id) {}
+    // TODO: Multiple instance need to be handle separately.
+    void add_link(const std::string src, const std::string dst, double amount) {
+        sg4::ExecTaskPtr s_task = this->task_by_name(src);
+        sg4::ExecTaskPtr d_task = this->task_by_name(dst);
+
+        sg4::Host *s_host = s_task->get_host();
+        sg4::Host *d_host = d_task->get_host();
+
+        if (s_host == d_host) {
+            s_task->add_successor(d_task);
+        } else {
+            std::string name = src + "_" + dst;
+            auto comm = sg4::CommTask::init(name, amount, s_host, d_host);
+
+            s_task->add_successor(comm);
+            comm->add_successor(d_task);
+
+            // links pointers are stored so that the object is not deleted.
+            this->links.push_back(comm);
+        }
+    }
+
+    // TODO: Check if host can receive task or not
+    void mov_task(std::string name, sg4::Host *h) {
+        auto task = task_by_name(name);
+
+        if (task->get_host() == h)
+            return;
+
+        task->set_host(h);
+    }
 
     sg4::ExecTaskPtr task_by_name(const std::string name) {
         auto it = std::find_if(this->tasks.begin(), this->tasks.end(),
@@ -72,16 +99,23 @@ int main(int argc, char *argv[]) {
         {"A", 1, 1},
         {"B", 1, 1},
         {"C", 1, 1},
+        {"D", 1, 1},
     };
 
     std::vector<link_params> links{
         {"A", "B", 1},
         {"B", "C", 1},
+        {"A", "D", 1},
     };
 
     Workflow w = Workflow();
     w.init(bolts, links);
     w.task_by_name("A")->enqueue_firings(1);
+
+    auto task = w.task_by_name("D");
+    auto host = e.host_by_name("PM1");
+
+    w.mov_task("D", host);
 
     sg4::Task::on_completion_cb([](const sg4::Task *t) {
         XBT_INFO("Task %s finished (%d) (%d)", t->get_name().c_str(), t->get_count(),
