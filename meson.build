@@ -14,6 +14,7 @@ if not simgrid.found()
 endif
 
 executable('workflow', ['src/workflow.cpp', 'src/workflow.hpp'], dependencies: [simgrid, boost])
+executable('no_comms', ['src/no_comms.cpp'], dependencies: [simgrid, boost])
 
 executable('workloads', ['src/workloads.cpp'], dependencies: [simgrid, boost])
 executable('instances', ['src/instances.cpp'], dependencies: [simgrid, boost])

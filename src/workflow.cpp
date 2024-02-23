@@ -51,7 +51,8 @@ void Workflow::mov_job(const std::string name, sg4::Host *h) {
     });
 
     for (auto p : predecesors) {
-        XBT_INFO("\t%s", p->get_name().c_str());
+        if (p->get_host()->get_cname() == job->get_host()->get_cname())
+            XBT_INFO("asdf");
     }
 
     job->set_host(h);
