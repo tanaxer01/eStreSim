@@ -3,8 +3,8 @@
 XBT_LOG_NEW_DEFAULT_CATEGORY(workload, "Variable workload tests");
 namespace sg4 = simgrid::s4u;
 
-// TODO: Podemos reutilizar la funcion del nico o algo similar y que el actor genere
-//       la carga segun un archivo.
+//  TODO: Podemos reutilizar la funcion del nico o algo similar y que el actor genere la carga segun
+//  un archivo.
 static void variable_load(sg4::TaskPtr t) {
     XBT_INFO("--- Small load ---");
     for (int i = 0; i < 3; i++) {

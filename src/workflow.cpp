@@ -1,101 +1,108 @@
+#include "workflow.hpp"
 #include <simgrid/s4u.hpp>
 
 XBT_LOG_NEW_DEFAULT_CATEGORY(workflow, "workflow");
 namespace sg4 = simgrid::s4u;
 
-typedef struct task_params {
-    std::string name;
-    double amount;
-    int instances;
-} task_params;
+Workflow::Workflow(std::string name) { this->name = name; }
 
-typedef struct link_params {
-    std::string src;
-    std::string dst;
-    double amount;
-} link_params;
+Workflow::~Workflow() {
+    this->jobs.clear();
+    this->links.clear();
+}
 
-class Workflow {
-  public:
-    Workflow() {}
-    // TODO: Temporal func, this will be executed when loading a JSON file (or smth like thata).
-    //       Above structs are just to simulate the JSON structure.
-    void init(std::vector<task_params> tasks, std::vector<link_params> links) {
-        auto e = sg4::Engine::get_instance();
-        auto hosts = e->get_all_hosts();
+void Workflow::init(std::vector<job_params> jobs, std::vector<link_params> links) {
+    //  TODO: Temporal func, this will be executed when loading a JSON file (or smth like thata).
+    //  Above structs are just to simulate the JSON structure.
+    auto e = sg4::Engine::get_instance();
+    auto hosts = e->get_all_hosts();
 
-        // Just plain ol' round robin
-        int count = 0;
-        for (auto t : tasks) {
-            add_task(t.name, t.amount, t.instances, hosts[count]);
-            count = (count + 1 < (int)hosts.size()) ? count + 1 : 0;
-        }
-
-        for (auto l : links) {
-            this->add_link(l.src, l.dst, l.amount);
-        }
-
-        for (auto t : this->tasks) {
-            for (auto l : t->get_successors()) {
-                XBT_INFO("%s %s", t->get_cname(), l->get_cname());
-            }
-        }
-    };
-
-    void add_task(const std::string name, double amount, int paralelism_degree, sg4::Host *h) {
-        this->tasks.push_back(sg4::ExecTask::init(name, amount, h));
+    //  TODO: More than just plain ol' round robin
+    int count = 0;
+    for (auto j : jobs) {
+        this->add_job(j.name, j.amount, j.instances, hosts[count]);
+        count = (count + 1 < (int)hosts.size()) ? count + 1 : 0;
     }
 
-    // TODO: Multiple instance need to be handle separately.
-    void add_link(const std::string src, const std::string dst, double amount) {
-        sg4::ExecTaskPtr s_task = this->task_by_name(src);
-        sg4::ExecTaskPtr d_task = this->task_by_name(dst);
+    for (auto l : links) {
+        this->add_link(l.src, l.dst, l.amount);
+    }
+}
 
-        sg4::Host *s_host = s_task->get_host();
-        sg4::Host *d_host = d_task->get_host();
+void Workflow::add_job(const std::string name, double amount, int paralelism_degree, sg4::Host *h) {
+    this->jobs.push_back(sg4::ExecTask::init(name, amount, h));
+}
 
-        if (s_host == d_host) {
-            s_task->add_successor(d_task);
-        } else {
-            std::string name = src + "_" + dst;
-            auto comm = sg4::CommTask::init(name, amount, s_host, d_host);
+void Workflow::mov_job(const std::string name, sg4::Host *h) {
+    //  TODO: Revisar si la tarea cabe dentro del Host.
+    auto job = this->job_by_name(name);
 
-            s_task->add_successor(comm);
-            comm->add_successor(d_task);
+    if (job->get_host() == h)
+        return;
 
-            // links pointers are stored so that the object is not deleted.
-            this->links.push_back(comm);
+    // Recorremos todos los hosts, podría hacerse con un bfs.
+    auto predecesors = this->get_filtered_jobs([name, job](JobPtr j) {
+        for (auto s : j->get_successors()) {
+            if (s->get_name().find(name) != std::string::npos)
+                return true;
         }
+
+        return false;
+    });
+
+    for (auto p : predecesors) {
+        XBT_INFO("\t%s", p->get_name().c_str());
     }
 
-    // TODO: Check if host can receive task or not
-    void mov_task(std::string name, sg4::Host *h) {
-        auto task = task_by_name(name);
+    job->set_host(h);
+}
 
-        if (task->get_host() == h)
-            return;
+void Workflow::add_link(const std::string src, const std::string dst, double amount) {
+    JobPtr s_task = this->job_by_name(src);
+    JobPtr d_task = this->job_by_name(dst);
 
-        task->set_host(h);
+    sg4::Host *s_host = s_task->get_host();
+    sg4::Host *d_host = d_task->get_host();
+
+    if (s_host == d_host) {
+        s_task->add_successor(d_task);
+    } else {
+        std::string name = src + "_" + dst;
+        auto comm = sg4::CommTask::init(name, amount, s_host, d_host);
+
+        s_task->add_successor(comm);
+        comm->add_successor(d_task);
+
+        // links pointers are stored so that the object is not deleted.
+        this->links.push_back(comm);
+    }
+}
+
+JobPtr Workflow::job_by_name(const std::string name) {
+    auto it = std::find_if(this->jobs.begin(), this->jobs.end(),
+                           [name](sg4::TaskPtr t) { return t->get_name() == name; });
+
+    xbt_assert(it != this->jobs.end());
+    return *it;
+}
+
+std::vector<JobPtr> Workflow::get_filtered_jobs(const std::function<bool(JobPtr)> &filter) {
+    std::vector<JobPtr> jobs;
+    for (auto t : this->jobs) {
+        if (filter(t))
+            jobs.push_back(t);
     }
 
-    sg4::ExecTaskPtr task_by_name(const std::string name) {
-        auto it = std::find_if(this->tasks.begin(), this->tasks.end(),
-                               [name](sg4::TaskPtr t) { return t->get_cname() == name; });
+    return jobs;
+}
 
-        xbt_assert(it != this->tasks.end());
-        return *it;
-    }
-
-  private:
-    std::vector<sg4::ExecTaskPtr> tasks;
-    std::vector<sg4::CommTaskPtr> links;
-};
+std::vector<JobPtr> Workflow::get_all_jobs() { return this->jobs; }
 
 int main(int argc, char *argv[]) {
     sg4::Engine e(&argc, argv);
     e.load_platform(argv[1]);
 
-    std::vector<task_params> bolts{
+    std::vector<job_params> bolts{
         {"A", 1, 1},
         {"B", 1, 1},
         {"C", 1, 1},
@@ -108,14 +115,15 @@ int main(int argc, char *argv[]) {
         {"A", "D", 1},
     };
 
-    Workflow w = Workflow();
+    Workflow w = Workflow("test");
     w.init(bolts, links);
-    w.task_by_name("A")->enqueue_firings(1);
 
-    auto task = w.task_by_name("D");
+    w.job_by_name("A")->enqueue_firings(1);
+
+    auto job = w.job_by_name("D");
     auto host = e.host_by_name("PM1");
 
-    w.mov_task("D", host);
+    w.mov_job("D", host);
 
     sg4::Task::on_completion_cb([](const sg4::Task *t) {
         XBT_INFO("Task %s finished (%d) (%d)", t->get_name().c_str(), t->get_count(),
