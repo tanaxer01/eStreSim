@@ -1,5 +1,5 @@
 [wrap-git]
-url = https://framagit.org/simgrid/simgrid
+url = https://github.com/tanaxer01/simgrid
 revision = master
 depth = 1
 method = cmake
