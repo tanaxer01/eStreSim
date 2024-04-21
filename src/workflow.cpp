@@ -1,21 +1,19 @@
 #include "workflow.hpp"
-#include "boost/smart_ptr/intrusive_ptr.hpp"
-#include "simgrid/s4u/Task.hpp"
-#include "xbt/log.h"
-#include <simgrid/s4u.hpp>
-#include <string>
 
 XBT_LOG_NEW_DEFAULT_CATEGORY(workflow, "workflow");
 namespace sg4 = simgrid::s4u;
 
-Workflow::Workflow(std::string name, sg4::Host *(*func)()) {
+Workflow::Workflow(std::string name, std::function<sg4::Host *()> sched) {
     this->name = name;
 
-    this->scheduler_func = func;
+    this->peek_instance = 0;
+    this->scheduling_func = sched;
 
-    this->peek_instance = -1;
+    // TODO: The grouping func should be provided by the user.
     this->grouping_func = [this](std::string task) {
-        this->peek_instance = (this->peek_instance != (this->tasks[task]->get_instance_count() - 3)) ? this->peek_instance + 1 : 0;
+        this->peek_instance = (this->peek_instance != (this->tasks[task]->get_instance_count() - 3))
+                                  ? this->peek_instance + 1
+                                  : 0;
         return "instance_" + std::to_string(this->peek_instance);
     };
 }
@@ -58,7 +56,7 @@ void update_related_tasks(sg4::TaskPtr root, sg4::ExecTaskPtr task, std::string 
 }
 
 void Workflow::add_task(const std::string &name, double amount, int instances) {
-    this->tasks[name] = sg4::ExecTask::init(name, amount, this->scheduler_func());
+    this->tasks[name] = sg4::ExecTask::init(name, amount, this->scheduling_func());
 
     if (instances == 1)
         return;
@@ -66,27 +64,35 @@ void Workflow::add_task(const std::string &name, double amount, int instances) {
     // if `instances` > 1 generate and assignate the rest of instances.
     this->tasks[name]->add_instances(instances - 1);
     for (int i = 1; i < instances; i++)
-        this->tasks[name]->set_host(this->scheduler_func(), "instance_" + std::to_string(i));
+        this->tasks[name]->set_host(this->scheduling_func(), "instance_" + std::to_string(i));
 
-    // Handle grouping.
-    // TODO: This needs to be like Storms groupings.
-    // TODO: How do we define root nodes ??
     this->tasks[name]->set_load_balancing_function([&, name]() {
+        std::string next_instance = grouping_func(name);
 
-        //this->completed_instances[name].push(this->peek_instance);
+        // Marks the current instance as completed but awaiting the following Comm.
+        completed_instances[name].push(peek_instance);
 
-        // Updates the predecessors.
-        // update_related_tasks(tasks["A"], tasks[name], "instance_" + std::to_string(this->peek_instance));
+        // Update all task predecessors.
+        update_related_tasks(tasks["A"], tasks[name], next_instance);
 
-        std::string ret;
-        if (following_instances[name].empty()) {
-           ret = this->grouping_func(name);
-        } else {
-            ret = following_instances[name].front();
-            following_instances[name].pop();
+        return next_instance;
+    });
+
+    sg4::Task::on_start_cb([&](sg4::Task *t) {
+        auto comm_task = dynamic_cast<sg4::CommTask *>(t);
+
+        // We only care about comm tasks.
+        if (!comm_task)
+            return;
+
+        size_t sep = comm_task->get_name().find("_");
+        std::string src = comm_task->get_name().substr(0, sep);
+
+        if (!completed_instances[src].empty()) {
+            auto next_instance = "instance_" + std::to_string(completed_instances[src].front());
+            completed_instances[src].pop();
+            comm_task->set_source(tasks[src]->get_host(next_instance));
         }
-
-        return ret;
     });
 
     // Successors must be updated AFTER the instance ends.
@@ -115,7 +121,7 @@ void Workflow::add_link(std::string src, std::string dst, float amount) {
     link->add_successor(this->tasks[dst]);
     this->links.push_back(link);
 
-    // This callback is incharge of updating which host is chosen depending of each task instances.
+    /*
     sg4::Task::on_instance_completion_cb([&](sg4::Task *t, std::string instance) {
         auto ct = dynamic_cast<sg4::CommTask *>(t);
         if (!ct)
@@ -124,7 +130,7 @@ void Workflow::add_link(std::string src, std::string dst, float amount) {
         // We need both task names.
         size_t sep = ct->get_name().find("_");
         std::string src = ct->get_name().substr(0, sep);
-        std::string dst = ct->get_name().substr(sep+1);
+        std::string dst = ct->get_name().substr(sep + 1);
 
         // If SRC has more than 1 instance already waiting for its comm.
         if (tasks[src]->get_instance_count() > 3 && !completed_instances[src].empty()) {
@@ -136,19 +142,12 @@ void Workflow::add_link(std::string src, std::string dst, float amount) {
         // if DST has more than 1 instance, iterate through them using the task grouping func.
         if (tasks[dst]->get_instance_count() > 3) {
             auto new_dst_instance = grouping_func(dst);
-            XBT_INFO("%s - changind dst from %s to %s", dst.c_str(), ct->get_destination()->get_cname(), new_dst_instance.c_str());
+            XBT_INFO("%s - changind dst from %s to %s", dst.c_str(),
+                     ct->get_destination()->get_cname(), new_dst_instance.c_str());
             ct->set_destination(tasks[dst]->get_host(new_dst_instance));
-            following_instances[dst].push(new_dst_instance);
         }
     });
-
-}
-
-sg4::Host *Workflow::get_next_host() {
-    auto ret = this->peek_next_host;
-    this->peek_next_host = this->scheduler_func();
-
-    return ret;
+    */
 }
 
 void Workflow::enqueue_firings(std::string name, int num) {

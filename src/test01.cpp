@@ -27,13 +27,11 @@ int main(int argc, char *argv[]) {
         {"A", 1, 1},
         {"B", 1, 2},
         {"C", 1, 1},
-        {"D", 1, 1},
     };
 
     std::vector<link_props> links{
         {"A", "B", 1},
         {"B", "C", 1},
-        {"C", "D", 1},
     };
 
     Workflow w = Workflow("test", round_robin);
@@ -80,8 +78,8 @@ int main(int argc, char *argv[]) {
 
         if (!w.completed_instances[src].empty()) {
             XBT_INFO("--> %d", w.completed_instances[src].front());
-            ct->set_source(w.tasks[src]->get_host("instance_" + std::to_string(w.completed_instances[src].front())));
-            w.completed_instances[src].pop();
+            ct->set_source(w.tasks[src]->get_host("instance_" +
+    std::to_string(w.completed_instances[src].front()))); w.completed_instances[src].pop();
         }
 
         // DESTINATION
