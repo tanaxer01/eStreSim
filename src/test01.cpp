@@ -14,28 +14,26 @@ sg4::Host *round_robin() {
     return hosts[counter];
 }
 
-int simple_grouping(int current, int max) {
-    return (current + 1 != max)? current + 1 : 0;
-}
+int simple_grouping(int current, int max) { return (current + 1 != max) ? current + 1 : 0; }
 
 int main(int argc, char **argv) {
     sg4::Engine e(&argc, argv);
     e.load_platform(argv[1]);
 
-    std::vector<exec_props> execs {
-        {"A", 1, 2},
+    std::vector<exec_props> execs{
+        {"A", 1, 2, true},
         {"B", 1, 2},
         {"C", 1, 2},
     };
 
-    std::vector<comm_props> comms {
+    std::vector<comm_props> comms{
         {"A", "B", 1},
         {"B", "C", 1},
     };
 
     Workflow w = Workflow("test", round_robin, simple_grouping);
     w.init(execs, comms);
-    w.enqueue_firings("A", 2);
+    w.enqueue_firings(2);
 
     e.run();
     return 0;

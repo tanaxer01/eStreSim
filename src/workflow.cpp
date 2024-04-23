@@ -10,6 +10,7 @@ Workflow::Workflow(std::string name, std::function<sg4::Host *()> sched_func,
     this->sched_func_ = sched_func;
     this->group_func_ = group_func;
 
+    // This cb is focused in logging events.
     sg4::Task::on_instance_completion_cb([](sg4::Task *t, std::string instance) {
         auto ct = dynamic_cast<sg4::CommTask *>(t);
 
@@ -26,16 +27,27 @@ Workflow::Workflow(std::string name, std::function<sg4::Host *()> sched_func,
 
 void Workflow::init(std::vector<exec_props> execs, std::vector<comm_props> comms) {
     for (auto e : execs)
-        this->add_exec(e.name, e.amount, e.instances);
+        this->add_exec(e.name, e.amount, e.instances, e.is_root);
 
     for (auto c : comms)
         this->add_comm(c.src, c.dst, c.amount);
+
+    for (auto item : this->execs_) {
+        for (int i = 0; i < item.second->get_instance_count() - 2; i++)
+            XBT_INFO("%s%d - %s", item.first.c_str(), i,
+                     item.second->get_host("instance_" + std::to_string(i))->get_cname());
+    }
+    XBT_INFO(
+        "-------------------------------------------------------------------------------------");
 }
 
-void Workflow::add_exec(std::string name, float amount, int instances) {
+void Workflow::add_exec(std::string name, float amount, int instances, bool is_root) {
     // We define the instance for instance 0, the dispatcher & the collector.
     this->execs_[name] = sg4::ExecTask::init(name, amount, this->sched_func_());
     this->current_instance_[name] = 0;
+
+    if (is_root)
+        this->roots.push_back(name);
 
     if (instances == 1)
         return;
@@ -44,10 +56,15 @@ void Workflow::add_exec(std::string name, float amount, int instances) {
     for (int i = 1; i < instances; i++)
         this->execs_[name]->set_host(this->sched_func_(), "instance_" + std::to_string(i));
 
+    // Handling the load balance of the task instances.
     this->execs_[name]->set_load_balancing_function([&, name]() {
         int instance_count = execs_[name]->get_instance_count() - 2;
 
-        current_instance_[name] = this->group_func_(current_instance_[name], instance_count);
+        // This instance has been completed.
+        this->completed_instances_[name].push(this->current_instance_[name]);
+
+        this->current_instance_[name] =
+            this->group_func_(this->current_instance_[name], instance_count);
         return "instance_" + std::to_string(current_instance_[name]);
     });
 }
@@ -62,8 +79,31 @@ void Workflow::add_comm(std::string src, std::string dst, float amount) {
 
     this->execs_[src]->add_successor(this->comms_[name]);
     this->comms_[name]->add_successor(this->execs_[dst]);
+
+    // If the source task has more than one instance, we can't update the CommTask src
+    // until the current instance comms have started.
+    if (this->execs_[src]->get_instance_count() > 3) {
+        this->comms_[name]->on_this_start_cb([this](sg4::Task *t) {
+            auto ct = dynamic_cast<sg4::CommTask *>(t);
+
+            if (!ct)
+                return;
+
+            size_t sep = ct->get_name().find("_");
+            std::string src = ct->get_name().substr(0, sep);
+
+            if (!this->completed_instances_[src].empty()) {
+                auto next_instance =
+                    "instance_" + std::to_string(this->completed_instances_[src].front());
+                this->completed_instances_[src].pop();
+                ct->set_source(this->execs_[src]->get_host(next_instance));
+                XBT_INFO("UP DST - %s to %s", src.c_str(), next_instance.c_str());
+            }
+        });
+    }
 }
 
-void Workflow::enqueue_firings(std::string name, int num) {
-    this->execs_[name]->enqueue_firings(num);
+void Workflow::enqueue_firings(int num) {
+    for (auto r : this->roots)
+        this->execs_[r]->enqueue_firings(num);
 }
