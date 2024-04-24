@@ -37,8 +37,7 @@ void Workflow::init(std::vector<exec_props> execs, std::vector<comm_props> comms
             XBT_INFO("%s%d - %s", item.first.c_str(), i,
                      item.second->get_host("instance_" + std::to_string(i))->get_cname());
     }
-    XBT_INFO(
-        "-------------------------------------------------------------------------------------");
+    XBT_INFO("----------------------------------------------------------------------------------");
 }
 
 void Workflow::add_exec(std::string name, float amount, int instances, bool is_root) {
@@ -60,12 +59,22 @@ void Workflow::add_exec(std::string name, float amount, int instances, bool is_r
     this->execs_[name]->set_load_balancing_function([&, name]() {
         int instance_count = execs_[name]->get_instance_count() - 2;
 
-        // This instance has been completed.
+        // Current instance is completed, but the following comm tasks may not be.
         this->completed_instances_[name].push(this->current_instance_[name]);
 
-        this->current_instance_[name] =
-            this->group_func_(this->current_instance_[name], instance_count);
-        return "instance_" + std::to_string(current_instance_[name]);
+        // Get the next instance and update predecessor comm tasks. 
+        int next_instance = this->group_func_(this->current_instance_[name], instance_count);
+        this->current_instance_[name] = next_instance;
+
+        // We need to update all comms that point to this task.
+        std::string instance_string = "instance_" + std::to_string(next_instance);
+        auto predecessors = this->get_task_predecessors(name);
+        for (auto p : predecessors) {
+            auto cp = boost::dynamic_pointer_cast<sg4::CommTask>(p);
+            cp->set_destination(this->execs_[name]->get_host(instance_string));
+        }
+
+        return instance_string;
     });
 }
 
@@ -93,11 +102,17 @@ void Workflow::add_comm(std::string src, std::string dst, float amount) {
             std::string src = ct->get_name().substr(0, sep);
 
             if (!this->completed_instances_[src].empty()) {
-                auto next_instance =
-                    "instance_" + std::to_string(this->completed_instances_[src].front());
-                this->completed_instances_[src].pop();
-                ct->set_source(this->execs_[src]->get_host(next_instance));
-                XBT_INFO("UP DST - %s to %s", src.c_str(), next_instance.c_str());
+                auto curr = this->current_instance_[src];
+                auto next = this->completed_instances_[src].front();
+
+                XBT_INFO("X %s %d %d X", src.c_str(), curr, next);
+
+                /*
+                        auto next_instance =
+                            "instance_" + std::to_string(this->completed_instances_[src].front());
+                        this->completed_instances_[src].pop();
+                        ct->set_source(this->execs_[src]->get_host(next_instance));
+                */
             }
         });
     }
@@ -106,4 +121,27 @@ void Workflow::add_comm(std::string src, std::string dst, float amount) {
 void Workflow::enqueue_firings(int num) {
     for (auto r : this->roots)
         this->execs_[r]->enqueue_firings(num);
+}
+
+std::vector<sg4::TaskPtr> Workflow::get_task_predecessors(std::string name) {
+    std::queue<sg4::TaskPtr> q;
+    std::vector<sg4::TaskPtr> res;
+
+    for (auto r : this->roots)
+        q.push(this->execs_[r]);
+
+    while (!q.empty()) {
+        auto curr = q.front();
+        q.pop();
+
+        for (auto s : curr->get_successors()) {
+            if (s->get_name() == name) {
+                res.push_back(curr);
+            } else {
+                q.push(s);
+            }
+        }
+    }
+
+    return res;
 }

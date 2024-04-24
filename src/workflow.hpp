@@ -26,6 +26,8 @@ class Workflow {
     void add_comm(std::string src, std::string dst, float amount);
     void enqueue_firings(int num);
 
+    std::vector<sg4::TaskPtr> get_task_predecessors(std::string name);
+
   private:
     std::string name;
 
