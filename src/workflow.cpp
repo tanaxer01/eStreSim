@@ -58,15 +58,15 @@ void Workflow::add_exec(std::string name, float amount, int instances, bool is_r
     // Handling the load balance of the task instances.
     this->execs_[name]->set_load_balancing_function([&, name]() {
         int instance_count = execs_[name]->get_instance_count() - 2;
-
-        // Current instance is completed, but the following comm tasks may not be.
-        this->completed_instances_[name].push(this->current_instance_[name]);
-
-        // Get the next instance and update predecessor comm tasks. 
         int next_instance = this->group_func_(this->current_instance_[name], instance_count);
-        this->current_instance_[name] = next_instance;
 
-        // We need to update all comms that point to this task.
+        // The current instance is marked as completed and awaiting for its succesors to be
+        // executed.
+        this->current_instance_[name] = next_instance;
+        //this->completed_instances_[name].push(curr_instance);
+        this->completed_instances_[name].push(next_instance);
+
+        // Once the instance is changed, we need to update all incomming comm tasks.
         std::string instance_string = "instance_" + std::to_string(next_instance);
         auto predecessors = this->get_task_predecessors(name);
         for (auto p : predecessors) {
@@ -92,7 +92,7 @@ void Workflow::add_comm(std::string src, std::string dst, float amount) {
     // If the source task has more than one instance, we can't update the CommTask src
     // until the current instance comms have started.
     if (this->execs_[src]->get_instance_count() > 3) {
-        this->comms_[name]->on_this_start_cb([this](sg4::Task *t) {
+        this->comms_[name]->on_this_completion_cb([this](sg4::Task *t) {
             auto ct = dynamic_cast<sg4::CommTask *>(t);
 
             if (!ct)
@@ -102,17 +102,10 @@ void Workflow::add_comm(std::string src, std::string dst, float amount) {
             std::string src = ct->get_name().substr(0, sep);
 
             if (!this->completed_instances_[src].empty()) {
-                auto curr = this->current_instance_[src];
-                auto next = this->completed_instances_[src].front();
+                auto curr = this->completed_instances_[src].front();
+                this->completed_instances_[src].pop();
 
-                XBT_INFO("X %s %d %d X", src.c_str(), curr, next);
-
-                /*
-                        auto next_instance =
-                            "instance_" + std::to_string(this->completed_instances_[src].front());
-                        this->completed_instances_[src].pop();
-                        ct->set_source(this->execs_[src]->get_host(next_instance));
-                */
+                ct->set_source(this->execs_[src]->get_host("instance_" + std::to_string(curr)));
             }
         });
     }

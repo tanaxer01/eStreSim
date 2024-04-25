@@ -14,16 +14,18 @@ sg4::Host *round_robin() {
     return hosts[counter];
 }
 
-int simple_grouping(int current, int max) { return (current + 1 != max) ? current + 1 : 0; }
+int simple_grouping(int current, int max) {
+    return (current + 1 != max && current != -1) ? current + 1 : 0;
+}
 
 int main(int argc, char **argv) {
     sg4::Engine e(&argc, argv);
     e.load_platform(argv[1]);
 
     std::vector<exec_props> execs{
-        {"A", 1, 2, true},
+        {"A", 1, 1, true},
         {"B", 1, 2},
-        {"C", 1, 2},
+        {"C", 1, 1},
     };
 
     std::vector<comm_props> comms{
