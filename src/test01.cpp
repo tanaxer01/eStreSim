@@ -1,6 +1,4 @@
 #include "workflow.hpp"
-#include <string>
-#include <vector>
 
 XBT_LOG_NEW_DEFAULT_CATEGORY(test01, "test01 logs");
 
