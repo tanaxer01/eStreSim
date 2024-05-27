@@ -6,6 +6,7 @@ project('stream_sim', 'cpp',
 )
 
 simgrid = dependency('simgrid', required : false)
+zeromq  = dependency('libzmq')
 boost   = dependency('boost')
 
 if not simgrid.found()
@@ -13,4 +14,17 @@ if not simgrid.found()
   simgrid = simgrid_project.get_variable('simgrid_dep')
 endif
 
-executable('test01', ['src/test01.cpp', 'src/workflow.cpp', 'src/workflow.hpp', 'src/events.cpp', 'src/events.hpp'], dependencies: [simgrid, boost])
+executable('test01', [
+  'src/test01.cpp',
+  'src/workflow.cpp',
+  'src/workflow.hpp', 
+  'src/events.cpp', 
+  'src/events.hpp',
+  'src/scheduling.hpp',
+  'src/scheduling.cpp'
+  ], dependencies: [simgrid, boost, zeromq])
+executable('text02', [
+  'src/test02.cpp',
+  'src/scheduling.hpp',
+  'src/scheduling.cpp'
+], dependencies: [simgrid, boost, zeromq])

@@ -16,13 +16,33 @@ std::string event_type_to_string(EventType type) {
     }
 }
 
-std::string event_to_csv(EventType type, float time, std::string src, std::string dst,
-                         std::string instance) {
-    std::ostringstream row;
+std::string Event::type_string() {
+    switch (this->type) {
+    case EventType::TaskStart:
+        return "TaskStart";
+    case EventType::TaskEnd:
+        return "TaskEnd";
+    case EventType::CommStart:
+        return "CommStart";
+    case EventType::CommEnd:
+        return "CommEnd";
+    default:
+        return "";
+    }
+}
 
-    row << std::to_string(time) << ";" << event_type_to_string(type) << ";" << src << ";"
-        << instance << ";" << dst << "\n";
-    return row.str();
+std::string Event::to_string() {
+    std::stringstream ss;
+
+    ss << time <<"," <<this->type_string() <<",";
+    for (size_t i = 0; i < this->data.size(); i++) {
+        ss <<this->data[i];
+
+        if (i < this->data.size() - 1)
+            ss <<",";
+    }
+
+    return ss.str();
 }
 
 std::string event_to_string(EventType type, float time, std::vector<std::string> data) {

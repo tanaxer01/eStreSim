@@ -17,9 +17,10 @@ Workflow::Workflow(std::string name, std::function<sg4::Host *()> sched_func,
         if (ct) {
             std::vector<std::string> fields{ct->get_name(), ct->get_source()->get_name(),
                                             ct->get_destination()->get_name()};
-            XBT_INFO(
-                "%s",
-                event_to_string(EventType::CommStart, sg4::Engine::get_clock(), fields).c_str());
+
+            Event e = { EventType::CommStart, sg4::Engine::get_clock(), fields };
+            //XBT_INFO( "%s", event_to_string(EventType::CommStart, sg4::Engine::get_clock(), fields).c_str());
+            XBT_INFO("%s", e.to_string().c_str());
         } else {
             auto et = dynamic_cast<sg4::ExecTask *>(t);
 
