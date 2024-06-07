@@ -7,6 +7,7 @@ project('stream_sim', 'cpp',
 
 simgrid = dependency('simgrid', required : false)
 zeromq  = dependency('libzmq')
+json = dependency('nlohmann_json')
 boost   = dependency('boost')
 
 if not simgrid.found()
@@ -20,11 +21,12 @@ executable('test01', [
   'src/workflow.hpp', 
   'src/events.cpp', 
   'src/events.hpp',
-  'src/scheduling.hpp',
-  'src/scheduling.cpp'
-  ], dependencies: [simgrid, boost, zeromq])
+  ], dependencies: [simgrid, boost])
+  
 executable('text02', [
   'src/test02.cpp',
   'src/scheduling.hpp',
-  'src/scheduling.cpp'
-], dependencies: [simgrid, boost, zeromq])
+  'src/scheduling.cpp',
+  'src/protocol.hpp',
+  'src/protocol.cpp'
+], dependencies: [simgrid, boost, zeromq, json])

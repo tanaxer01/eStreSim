@@ -1,0 +1,12 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "compile && run test01",
+            "type": "shell",
+            "command": "meson compile -C build && ./build/test01 platforms/three_multicore_hosts.xml",
+        }
+    ]
+}

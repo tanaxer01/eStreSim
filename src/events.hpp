@@ -23,3 +23,10 @@ std::string event_type_to_string(EventType type);
 std::string event_to_string(EventType type, float time, std::vector<std::string> data);
 
 // class CsvLogger {};
+
+class TaskTracker {
+
+
+    private:
+        std::vector<Event> events;
+};

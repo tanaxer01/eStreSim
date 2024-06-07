@@ -1,5 +1,4 @@
 #include "workflow.hpp"
-#include "scheduling.hpp"
 
 XBT_LOG_NEW_CATEGORY(test01, "test01 logs");
 
@@ -36,9 +35,6 @@ int main(int argc, char **argv) {
     w.init(execs, comms);
     w.enqueue_firings(2);
 
-    scheduler_start("tcp://localhost:5001");
     e.run();
-    scheduler_stop();
-
     return 0;
 }
