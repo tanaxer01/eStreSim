@@ -10,42 +10,6 @@ Workflow::Workflow(std::string name, std::function<sg4::Host *()> sched_func,
     this->name = name;
     this->sched_func_ = sched_func;
     this->group_func_ = group_func;
-
-    // This cb is focused in logging events.
-    sg4::Task::on_instance_start_cb([](sg4::Task *t, std::string instance) {
-        auto ct = dynamic_cast<sg4::CommTask *>(t);
-        if (ct) {
-            std::vector<std::string> fields{ct->get_name(), ct->get_source()->get_name(),
-                                            ct->get_destination()->get_name()};
-
-            Event e = { EventType::CommStart, sg4::Engine::get_clock(), fields };
-            //XBT_INFO( "%s", event_to_string(EventType::CommStart, sg4::Engine::get_clock(), fields).c_str());
-            XBT_INFO("%s", e.to_string().c_str());
-        } else {
-            auto et = dynamic_cast<sg4::ExecTask *>(t);
-
-            std::vector<std::string> fields{et->get_name(), instance};
-            XBT_INFO(
-                "%s",
-                event_to_string(EventType::TaskStart, sg4::Engine::get_clock(), fields).c_str());
-        }
-    });
-    sg4::Task::on_instance_completion_cb([](sg4::Task *t, std::string instance) {
-        auto ct = dynamic_cast<sg4::CommTask *>(t);
-
-        if (ct) {
-            std::vector<std::string> fields{ct->get_name(), ct->get_source()->get_name(),
-                                            ct->get_destination()->get_name()};
-            XBT_INFO("%s",
-                     event_to_string(EventType::CommEnd, sg4::Engine::get_clock(), fields).c_str());
-        } else {
-            auto et = dynamic_cast<sg4::ExecTask *>(t);
-
-            std::vector<std::string> fields{et->get_name(), instance};
-            XBT_INFO("%s",
-                     event_to_string(EventType::TaskEnd, sg4::Engine::get_clock(), fields).c_str());
-        }
-    });
 }
 
 void Workflow::init(std::vector<exec_props> execs, std::vector<comm_props> comms) {

@@ -1,4 +1,5 @@
 #include "workflow.hpp"
+#include "events.hpp"
 
 XBT_LOG_NEW_CATEGORY(test01, "test01 logs");
 
@@ -7,7 +8,7 @@ sg4::Host *round_robin() {
     auto hosts = engine->get_all_hosts();
 
     static int counter = -1;
-    counter = (counter + 1 < hosts.size()) ? counter + 1 : 0;
+    counter = (counter + 1 < (int) hosts.size()) ? counter + 1 : 0;
 
     return hosts[counter];
 }
@@ -21,9 +22,9 @@ int main(int argc, char **argv) {
     e.load_platform(argv[1]);
 
     std::vector<exec_props> execs{
-        {"A", 1, 1, true},
-        {"B", 1, 2},
-        {"C", 1, 1},
+        {"A", 1e8, 1, true},
+        {"B", 1e8, 2},
+        {"C", 1e8, 1},
     };
 
     std::vector<comm_props> comms{
@@ -35,6 +36,10 @@ int main(int argc, char **argv) {
     w.init(execs, comms);
     w.enqueue_firings(2);
 
+    TaskTracer tt = TaskTracer(); 
+
     e.run();
+
+    tt.save("tasks_logs.csv");
     return 0;
 }

@@ -1,7 +1,13 @@
-#include "events.hpp"
+#include <simgrid/s4u.hpp>
+#include <fstream>
 #include <sstream>
 
-std::string event_type_to_string(EventType type) {
+#include "events.hpp"
+
+XBT_LOG_NEW_DEFAULT_CATEGORY(event, "event");
+namespace sg4 = simgrid::s4u;
+
+std::string event_to_string(EventType type) {
     switch (type) {
     case EventType::TaskStart:
         return "TaskStart";
@@ -12,51 +18,53 @@ std::string event_type_to_string(EventType type) {
     case EventType::CommEnd:
         return "CommEnd";
     default:
-        return NULL;
+        return "Unknown";
     }
 }
 
-std::string Event::type_string() {
-    switch (this->type) {
-    case EventType::TaskStart:
-        return "TaskStart";
-    case EventType::TaskEnd:
-        return "TaskEnd";
-    case EventType::CommStart:
-        return "CommStart";
-    case EventType::CommEnd:
-        return "CommEnd";
-    default:
-        return "";
-    }
+TaskTracer::TaskTracer() {
+    sg4::Task::on_instance_start_cb([this](sg4::Task *t, std::string instance) {
+        auto et = dynamic_cast<sg4::ExecTask *>(t);
+        if (et)
+            this->log_event(EventType::TaskStart, sg4::Engine::get_clock(),
+                            std::vector<std::string>{et->get_name(), instance, et->get_host()->get_name()});
+    });
+
+    sg4::Task::on_instance_completion_cb([this](sg4::Task *t, std::string instance) {
+        auto et = dynamic_cast<sg4::ExecTask *>(t);
+        if (et)
+            this->log_event(EventType::TaskEnd, sg4::Engine::get_clock(),
+                            std::vector<std::string>{et->get_name(), instance, et->get_host()->get_name()});
+    });
 }
 
-std::string Event::to_string() {
+void TaskTracer::log_event(EventType type, double time, std::vector<std::string> message) {
+    std::string key = message[0] + ";" + message[1];
+
+    if (type == EventType::TaskStart) {
+        xbt_assert(this->started.find(key) == this->started.end(),
+                   "TaskStart callback called before TaskEnd for %s", key.c_str());
+        this->started[key] = time;
+        return;
+    }
+
+    xbt_assert(this->started.find(key) != this->started.end(),
+               "TaskEnd callback called before TaskStart for %s", key.c_str());
+
+    XBT_INFO("Task %s, %s ended at %lf", message[0].c_str(), message[1].c_str(), time);
     std::stringstream ss;
+    ss <<message[0] <<"," <<message[1] <<"," <<message[2] <<"," <<this->started[key] <<"," <<time <<"," <<(time - this->started[key]) <<"\n";
 
-    ss << time <<"," <<this->type_string() <<",";
-    for (size_t i = 0; i < this->data.size(); i++) {
-        ss <<this->data[i];
-
-        if (i < this->data.size() - 1)
-            ss <<",";
-    }
-
-    return ss.str();
+    this->events.push_back(ss.str());
+    this->started.erase(key);
 }
 
-std::string event_to_string(EventType type, float time, std::vector<std::string> data) {
-    std::ostringstream ss;
-    ss << time << "," << event_type_to_string(type) << ",";
-    for(int i = 0; i < data.size(); i++) {
-        ss << data[i];
+void TaskTracer::save(const std::string &filename) {
+    std::ofstream f(filename);
 
-        if (i < (int)data.size()-1)
-            ss << ",";
-    }
+    f << "name,instance,host,start,end,duration\n";
+    for (auto &s : this->events)
+        f << s;
 
-    ss << "\n";
-    
-
-    return ss.str();
+    f.close();
 }
