@@ -30,3 +30,13 @@ executable('text02', [
   'src/protocol.hpp',
   'src/protocol.cpp'
 ], dependencies: [simgrid, boost, zeromq, json])
+
+executable('test03', [
+  'src/test03.cpp',
+  'src/events.hpp',
+  'src/events.cpp',
+  'src/scheduler.hpp',
+  'src/scheduler.cpp',
+  'src/generator.hpp',
+  'src/generator.cpp',
+], dependencies: [simgrid])

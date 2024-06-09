@@ -25,16 +25,18 @@ std::string event_to_string(EventType type) {
 TaskTracer::TaskTracer() {
     sg4::Task::on_instance_start_cb([this](sg4::Task *t, std::string instance) {
         auto et = dynamic_cast<sg4::ExecTask *>(t);
-        if (et)
-            this->log_event(EventType::TaskStart, sg4::Engine::get_clock(),
+        if (!et) return;
+
+        this->log_event(EventType::TaskStart, sg4::Engine::get_clock(),
                             std::vector<std::string>{et->get_name(), instance, et->get_host()->get_name()});
     });
 
     sg4::Task::on_instance_completion_cb([this](sg4::Task *t, std::string instance) {
         auto et = dynamic_cast<sg4::ExecTask *>(t);
-        if (et)
-            this->log_event(EventType::TaskEnd, sg4::Engine::get_clock(),
-                            std::vector<std::string>{et->get_name(), instance, et->get_host()->get_name()});
+        if (!et) return;
+
+        this->log_event(EventType::TaskEnd, sg4::Engine::get_clock(),
+                        std::vector<std::string>{et->get_name(), instance, et->get_host()->get_name()});
     });
 }
 
