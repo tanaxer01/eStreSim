@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include <map>
 
 enum EventType { 
   TaskStart,
@@ -11,7 +12,7 @@ enum EventType {
 std::string event_to_string(EventType type);
 
 /** @brief Handles the simulation logs and metrics */
-// class Tracer {}
+class ITracer {};
 
 /** @brief Tracer focused in task related metrics */
 class TaskTracer {

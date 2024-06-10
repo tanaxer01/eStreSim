@@ -39,4 +39,6 @@ executable('test03', [
   'src/scheduler.cpp',
   'src/generator.hpp',
   'src/generator.cpp',
+  'src/workflow.hpp',
+  'src/workflow.cpp',
 ], dependencies: [simgrid])

@@ -1,120 +1,78 @@
 #include "workflow.hpp"
-#include "events.hpp"
-#include <string>
 
-XBT_LOG_NEW_DEFAULT_CATEGORY(workflow, "workflow");
-namespace sg4 = simgrid::s4u;
+XBT_LOG_NEW_DEFAULT_CATEGORY(workflow, "workflow logs");
 
-Workflow::Workflow(std::string name, std::function<sg4::Host *()> sched_func,
-                   std::function<int(int current, int max)> group_func) {
-    this->name = name;
-    this->sched_func_ = sched_func;
-    this->group_func_ = group_func;
-}
+void Workflow::add_task(std::string name, float amount, int instances) {
+    xbt_assert(this->scheduler != nullptr, "Must specify Scheduler first");
+    xbt_assert(this->tasks_.find(name) == this->tasks_.end(), "Task already exists");
 
-void Workflow::init(std::vector<exec_props> execs, std::vector<comm_props> comms) {
-    for (auto e : execs)
-        this->add_exec(e.name, e.amount, e.instances, e.is_root);
-
-    for (auto c : comms)
-        this->add_comm(c.src, c.dst, c.amount);
-}
-
-void Workflow::add_exec(std::string name, float amount, int instances, bool is_root) {
-    // We define the instance for instance 0, the dispatcher & the collector.
-    this->execs_[name] = sg4::ExecTask::init(name, amount, this->sched_func_());
-    this->current_instance_[name] = 0;
-
-    if (is_root)
-        this->roots.push_back(name);
-
+    this->tasks_[name] = sg4::ExecTask::init(name, amount, this->scheduler->schedule());
     if (instances == 1)
         return;
 
-    this->execs_[name]->add_instances(instances - 1);
+    this->tasks_[name]->add_instances(instances - 1);
     for (int i = 1; i < instances; i++)
-        this->execs_[name]->set_host(this->sched_func_(), "instance_" + std::to_string(i));
+        this->tasks_[name]->set_host(this->scheduler->schedule(), "instance_" +
+        std::to_string(i));
+    // TODO: Handle load balancing
+};
 
-    // Handling the load balance of the task instances.
-    this->execs_[name]->set_load_balancing_function([&, name]() {
-        int instance_count = execs_[name]->get_instance_count() - 2;
-        int next_instance = this->group_func_(this->current_instance_[name], instance_count);
+void Workflow::add_link(std::string src, std::string dst, float amount) {
+    std::string key = src + "_" + dst;
 
-        // The current instance is marked as completed and awaiting for its succesors to be
-        // executed.
-        this->current_instance_[name] = next_instance;
-        // this->completed_instances_[name].push(curr_instance);
-        this->completed_instances_[name].push(next_instance);
+    xbt_assert(this->tasks_.find(src) != this->tasks_.end(), "Source task not found");
+    xbt_assert(this->tasks_.find(dst) != this->tasks_.end(), "Destination task not found");
+    xbt_assert(this->comms_.find(key) == this->comms_.end(), "Link already exists");
 
-        // Once the instance is changed, we need to update all incomming comm tasks.
-        std::string instance_string = "instance_" + std::to_string(next_instance);
-        auto predecessors = this->get_task_predecessors(name);
-        for (auto p : predecessors) {
-            auto cp = boost::dynamic_pointer_cast<sg4::CommTask>(p);
-            cp->set_destination(this->execs_[name]->get_host(instance_string));
+    auto src_host = this->tasks_[src]->get_host();
+    auto dst_host = this->tasks_[dst]->get_host();
+
+    this->comms_[key] = sg4::CommTask::init(key, amount, src_host, dst_host);
+
+    // Makes the connections in the graph
+    this->tasks_[src]->add_successor(this->comms_[key]);
+    this->comms_[key]->add_successor(this->tasks_[dst]);
+
+    // TODO: Handle load balancing
+};
+
+// template <class T> 
+// void Workflow::add_generator() {
+//     this->generator = std::make_unique<T>();
+// }
+//     this->running_actors += 1;
+
+//     auto source = this->tasks_["E0"];
+//     auto generator = sg4::Actor::create("generator_E0", source->get_host(), generator(source));
+
+//     generator->on_exit([this](bool failed) { this->running_actors--; });
+
+//     // this->generator = new T(this->tasks_["E0"]);
+// }
+
+template <typename T> 
+void Workflow::add_scheduler() {
+    this->scheduler = std::make_unique<T>();
+}
+
+// template <typename T> void Workflow::add_tracer() {
+//     //  this->tracers.push_back(new T());
+// }
+
+void Workflow::run() {
+    // xbt_assert(this->generator != nullptr, "Must specify a generator");
+    // xbt_assert(this->scheduler != nullptr, "Must specify a scheduler");
+
+    XBT_INFO("SIMULATION STARTED");
+    while (true) {
+        if (!this->running_actors) {
+            sg4::Engine::get_instance()->run();
+            break;
         }
 
-        return instance_string;
-    });
-}
-
-void Workflow::add_comm(std::string src, std::string dst, float amount) {
-    std::string name = src + "_" + dst;
-
-    // This are just the initial hosts if there are multiple instances.
-    auto src_host = this->execs_[src]->get_host();
-    auto dst_host = this->execs_[dst]->get_host();
-    this->comms_[name] = sg4::CommTask::init(name, amount, src_host, dst_host);
-
-    this->execs_[src]->add_successor(this->comms_[name]);
-    this->comms_[name]->add_successor(this->execs_[dst]);
-
-    // If the source task has more than one instance, we can't update the CommTask src
-    // until the current instance comms have started.
-    if (this->execs_[src]->get_instance_count() > 3) {
-        this->comms_[name]->on_this_completion_cb([this](sg4::Task *t) {
-            auto ct = dynamic_cast<sg4::CommTask *>(t);
-
-            if (!ct)
-                return;
-
-            size_t sep = ct->get_name().find("_");
-            std::string src = ct->get_name().substr(0, sep);
-
-            if (!this->completed_instances_[src].empty()) {
-                auto curr = this->completed_instances_[src].front();
-                this->completed_instances_[src].pop();
-
-                ct->set_source(this->execs_[src]->get_host("instance_" + std::to_string(curr)));
-            }
-        });
-    }
-}
-
-void Workflow::enqueue_firings(int num) {
-    for (auto r : this->roots)
-        this->execs_[r]->enqueue_firings(num);
-}
-
-std::vector<sg4::TaskPtr> Workflow::get_task_predecessors(std::string name) {
-    std::queue<sg4::TaskPtr> q;
-    std::vector<sg4::TaskPtr> res;
-
-    for (auto r : this->roots)
-        q.push(this->execs_[r]);
-
-    while (!q.empty()) {
-        auto curr = q.front();
-        q.pop();
-
-        for (auto s : curr->get_successors()) {
-            if (s->get_name() == name) {
-                res.push_back(curr);
-            } else {
-                q.push(s);
-            }
-        }
+        // TODO: Here we should check if we need to reschedule?
+        sg4::Engine::get_instance()->run_until(sg4::Engine::get_clock() + 1);
     }
 
-    return res;
+    XBT_INFO("SIMULATION ENDED");
 }

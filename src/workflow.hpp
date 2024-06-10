@@ -1,42 +1,48 @@
+#include <map>
+#include <memory>
 #include <simgrid/s4u.hpp>
-#include <string>
-#include <vector>
+
+#include "events.hpp"
+#include "generator.hpp"
+#include "scheduler.hpp"
+
 namespace sg4 = simgrid::s4u;
 
-typedef struct exec_props {
-    std::string name;
-    double amount;
-    int instances;
-    bool is_root = false;
-} exec_props;
+class IGrouping {};
 
-typedef struct comm_props {
-    std::string src;
-    std::string dst;
-    double amount;
-} comm_props;
-
+/** @brief Contains the elements of the graph ands is encharged of modifying it correctly */
 class Workflow {
   public:
-    Workflow(std::string name, std::function<sg4::Host *()> sched_func,
-             std::function<int(int current, int max)> group_func);
+    Workflow(std::string name) : name(name) {}
 
-    void init(std::vector<exec_props> execs, std::vector<comm_props> comms);
-    void add_exec(std::string name, float amount, int instances, bool is_root = false);
-    void add_comm(std::string src, std::string dst, float amount);
-    void enqueue_firings(int num);
+    /** @brief Generates a new task and the number of instances specified. */
+    void add_task(std::string name, float amount, int instances);
+    /** @brief Generates a link between src and dst. (They must already exist inside the workload)*/
+    void add_link(std::string src, std::string dst, float amount);
 
-    std::vector<sg4::TaskPtr> get_task_predecessors(std::string name);
+    template <class T> 
+    void add_generator();
+
+    template <class T> 
+    void add_scheduler();
+
+    // void add_scheduler(IScheduler *scheduler);
+
+    // template <class T> 
+    // void add_tracer();
+
+    void run();
 
   private:
     std::string name;
+    int running_actors = 0;
 
-    std::function<sg4::Host *()> sched_func_;
-    std::function<int(int current, int max)> group_func_;
+    // IScheduler *scheduler;
+    std::unique_ptr<IScheduler> scheduler;
+    // std::vector<ITracer *> tracers;
 
-    std::vector<std::string> roots;
-    std::map<std::string, sg4::ExecTaskPtr> execs_;
+    public:
+    std::map<std::string, sg4::ExecTaskPtr> tasks_;
     std::map<std::string, sg4::CommTaskPtr> comms_;
-    std::map<std::string, int> current_instance_;
-    std::map<std::string, std::queue<int>> completed_instances_;
+    std::map<std::string, IGrouping *> groupings_;
 };
