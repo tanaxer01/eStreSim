@@ -2,20 +2,24 @@
 
 XBT_LOG_NEW_DEFAULT_CATEGORY(workflow, "workflow logs");
 
-void Workflow::add_task(std::string name, float amount, int instances) {
-    xbt_assert(this->scheduler != nullptr, "Must specify Scheduler first");
-    xbt_assert(this->tasks_.find(name) == this->tasks_.end(), "Task already exists");
+// template void Workflow::add_task<SimpleGenerator>(std::string name, float amount, int instances);
 
-    this->tasks_[name] = sg4::ExecTask::init(name, amount, this->scheduler->schedule());
-    if (instances == 1)
-        return;
 
-    this->tasks_[name]->add_instances(instances - 1);
-    for (int i = 1; i < instances; i++)
-        this->tasks_[name]->set_host(this->scheduler->schedule(), "instance_" +
-        std::to_string(i));
-    // TODO: Handle load balancing
-};
+// void Workflow::add_task(std::string name, float amount, int instances) {
+//     xbt_assert(this->scheduler != nullptr, "Must specify Scheduler first");
+//     xbt_assert(this->tasks_.find(name) == this->tasks_.end(), "Task already exists");
+
+//     this->tasks_[name] = sg4::ExecTask::init(name, amount, this->scheduler->schedule());
+//     if (instances == 1)
+//         return;
+
+//     this->tasks_[name]->add_instances(instances - 1);
+//     for (int i = 1; i < instances; i++)
+//         this->tasks_[name]->set_host(this->scheduler->schedule(), "instance_" +
+//         std::to_string(i));
+
+//     // TODO: Handle load balancing
+// };
 
 void Workflow::add_link(std::string src, std::string dst, float amount) {
     std::string key = src + "_" + dst;
@@ -35,29 +39,6 @@ void Workflow::add_link(std::string src, std::string dst, float amount) {
 
     // TODO: Handle load balancing
 };
-
-// template <class T> 
-// void Workflow::add_generator() {
-//     this->generator = std::make_unique<T>();
-// }
-//     this->running_actors += 1;
-
-//     auto source = this->tasks_["E0"];
-//     auto generator = sg4::Actor::create("generator_E0", source->get_host(), generator(source));
-
-//     generator->on_exit([this](bool failed) { this->running_actors--; });
-
-//     // this->generator = new T(this->tasks_["E0"]);
-// }
-
-template <typename T> 
-void Workflow::add_scheduler() {
-    this->scheduler = std::make_unique<T>();
-}
-
-// template <typename T> void Workflow::add_tracer() {
-//     //  this->tracers.push_back(new T());
-// }
 
 void Workflow::run() {
     // xbt_assert(this->generator != nullptr, "Must specify a generator");

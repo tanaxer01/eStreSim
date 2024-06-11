@@ -1,11 +1,9 @@
-#include <simgrid/s4u.hpp>
 #include <fstream>
 #include <sstream>
 
 #include "events.hpp"
 
 XBT_LOG_NEW_DEFAULT_CATEGORY(event, "event");
-namespace sg4 = simgrid::s4u;
 
 std::string event_to_string(EventType type) {
     switch (type) {
@@ -70,3 +68,44 @@ void TaskTracer::save(const std::string &filename) {
 
     f.close();
 }
+
+CommTracer::CommTracer() {
+    sg4::Task::on_instance_start_cb([this](sg4::Task *t, std::string instance) {
+        auto ct = dynamic_cast<sg4::CommTask *>(t);
+        if (!ct) return;
+
+        this->log_event(EventType::CommStart, sg4::Engine::get_clock(),
+                            std::vector<std::string>{ct->get_name(), ct->get_source()->get_name(), ct->get_destination()->get_name()});
+    });
+
+    sg4::Task::on_instance_completion_cb([this](sg4::Task *t, std::string instance) {
+        auto ct = dynamic_cast<sg4::CommTask *>(t);
+        if (!ct) return;
+
+        this->log_event(EventType::CommEnd, sg4::Engine::get_clock(),
+                        std::vector<std::string>{ct->get_name(), ct->get_source()->get_name(), ct->get_destination()->get_name()});
+    });
+}
+
+void CommTracer::log_event(EventType type, double time, std::vector<std::string> message) {
+    std::string key = message[0] + ";" + message[1];
+
+    if (type == EventType::CommStart) {
+        xbt_assert(this->started.find(key) == this->started.end(),
+                   "CommStart callback called before CommEnd for %s", key.c_str());
+        this->started[key] = time;
+        return;
+    }
+
+    xbt_assert(this->started.find(key) != this->started.end(),
+               "CommEnd callback called before CommStart for %s", key.c_str());
+
+    XBT_INFO("Comm %s, %s ended at %lf", message[0].c_str(), message[1].c_str(), time);
+    std::stringstream ss;
+    ss <<message[0] <<"," <<message[1] <<"," <<message[2] <<"," <<this->started[key] <<"," <<time <<"," <<(time - this->started[key]) <<"\n";
+
+    this->events.push_back(ss.str());
+    this->started.erase(key);
+}
+
+void CommTracer::save(const std::string &filename) {}

@@ -1,3 +1,6 @@
+#ifndef SCHEDULER_HPP
+#define SCHEDULER_HPP
+
 #include <simgrid/s4u.hpp>
 namespace sg4 = simgrid::s4u;
 
@@ -20,3 +23,4 @@ class RoundRobinScheduler : public IScheduler {
 };
 
 // class ZMQScheduler : public IScheduler {};
+#endif

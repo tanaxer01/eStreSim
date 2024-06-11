@@ -33,12 +33,14 @@ executable('text02', [
 
 executable('test03', [
   'src/test03.cpp',
-  'src/events.hpp',
-  'src/events.cpp',
+  'src/workflow.hpp',
+  'src/workflow.cpp',
+  'src/grouping.hpp',
+  'src/grouping.cpp',
   'src/scheduler.hpp',
   'src/scheduler.cpp',
   'src/generator.hpp',
   'src/generator.cpp',
-  'src/workflow.hpp',
-  'src/workflow.cpp',
+  'src/events.hpp',
+  'src/events.cpp',
 ], dependencies: [simgrid])
