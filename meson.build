@@ -17,10 +17,8 @@ endif
 
 executable('test01', [
   'src/test01.cpp',
-  'src/workflow.cpp',
-  'src/workflow.hpp', 
-  'src/events.cpp', 
-  'src/events.hpp',
+  'src/task.cpp',
+  'src/task.hpp', 
   ], dependencies: [simgrid, boost])
   
 executable('text02', [
