@@ -1,0 +1,6 @@
+[build-system]
+requires = ["meson-python", "pybind11", "simgrid"]
+build-backend = "mesonpy"
+
+[tool.meson-python.args]
+dist = ['--include-subprojects']

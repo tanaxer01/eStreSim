@@ -1,0 +1,8 @@
+build
+.cache
+env
+
+
+subprojects/*
+!subprojects/*.wrap
+
