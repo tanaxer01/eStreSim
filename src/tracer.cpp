@@ -12,12 +12,12 @@ namespace estresim {
 
 std::string event_to_string(EventType type) {
     switch (type) {
-    case EventType::TaskRequest:
-        return "TaskRequest";
-    case EventType::TaskStart:
-        return "TaskStart";
-    case EventType::TaskEnd:
-        return "TaskEnd";
+    case EventType::JobRequest:
+        return "JobRequest";
+    case EventType::JobStart:
+        return "JobStart";
+    case EventType::JobEnd:
+        return "JobEnd";
     case EventType::CommStart:
         return "CommStart";
     case EventType::CommEnd:
@@ -30,14 +30,14 @@ std::string event_to_string(EventType type) {
 TaskTracer::TaskTracer() {
     /*
     Job::on_start_cb([this](Job *t, std::string instance) {
-        this->log_event(EventType::TaskStart, simgrid::s4u::Engine::get_clock(),
+        this->log_event(EventType::JobStart, simgrid::s4u::Engine::get_clock(),
                         std::vector<std::string>{t->get_name(), instance,
                                                  t->get_host(instance)->get_name(),
                                                  std::to_string(t->get_running_count(instance))});
     });
 
     Job::on_completion_cb([this](Job *t, std::string instance) {
-        this->log_event(EventType::TaskEnd, simgrid::s4u::Engine::get_clock(),
+        this->log_event(EventType::JobEnd, simgrid::s4u::Engine::get_clock(),
                         std::vector<std::string>{t->get_name(), instance,
                                                  t->get_host(instance)->get_name(),
                                                  std::to_string(t->get_running_count(instance))});
@@ -51,13 +51,13 @@ void TaskTracer::log_event(EventType type, double time, std::vector<std::string>
     /*
     XBT_INFO("[%s] %s", event_to_string(type).c_str(), key.c_str());
 
-    if (type == EventType::TaskStart) {
+    if (type == EventType::JobStart) {
         xbt_assert(this->started.find(key) == this->started.end(),
-                   "TaskStart callback called again before TaskEnd for %s", key.c_str());
+                   "JobStart callback called again before JobEnd for %s", key.c_str());
         this->started[key] = time;
     } else {
         xbt_assert(this->started.find(key) != this->started.end(),
-                   "TaskEnd callback called before TaskStart for %s", key.c_str());
+                   "JobEnd callback called before JobStart for %s", key.c_str());
 
         // this->events.push_back(ss.str());
         this->started.erase(key);
@@ -65,16 +65,16 @@ void TaskTracer::log_event(EventType type, double time, std::vector<std::string>
     */
 
     /*
-    if (type == EventType::TaskStart) {
+    if (type == EventType::JobStart) {
         xbt_assert(this->started.find(key) == this->started.end(),
-                   "TaskStart callback called before TaskEnd for %s", key.c_str());
+                   "JobStart callback called before JobEnd for %s", key.c_str());
         this->started[key] = time;
         return;
     }
     */
 
-    // xbt_assert(this->started.find(key) != this->started.end(), "TaskEnd callback called before
-    // TaskStart for %s", key.c_str());
+    // xbt_assert(this->started.find(key) != this->started.end(), "JobEnd callback called before
+    // JobStart for %s", key.c_str());
     /*
     std::stringstream ss;
     ss <<message[0] <<"," <<message[1] <<"," <<message[2] <<"," <<this->started[key] <<"," <<time
@@ -107,61 +107,65 @@ JobTracer::JobTracer() {
               "metadata"};
 
     Job::on_request_cb([this](Job *t, std::string instance, int n) {
-        for (int i = 0; i < n; i++)
-            log_event(EventType::TaskRequest, sg4::Engine::get_clock(), std::vector<std::string>{});
+        std::string key = t->get_name() + instance.substr(9);
+        // for (int i = 0; i < n; i++)
+        log_event(EventType::JobRequest, sg4::Engine::get_clock(),
+                  std::vector<std::string>{key, std::to_string(n)});
     });
 
     Job::on_start_cb([this](Job *t, std::string instance) {
-        log_event(EventType::TaskStart, sg4::Engine::get_clock(), std::vector<std::string>{});
+        std::string key = t->get_name() + instance.substr(9);
+        log_event(EventType::JobStart, sg4::Engine::get_clock(), std::vector<std::string>{key});
     });
 
     Job::on_completion_cb([this](Job *t, std::string instance) {
-        XBT_INFO("--> %s", t->get_host(instance)->get_cname());
-        log_event(EventType::TaskEnd, sg4::Engine::get_clock(),
-                  std::vector<std::string>{t->get_name(), instance.substr(9),
-                                           std::to_string(t->get_count(instance)), t->get_host(instance)->get_name()});
+        std::string key = t->get_name() + instance.substr(9);
+        log_event(EventType::JobEnd, sg4::Engine::get_clock(),
+                  std::vector<std::string>{key, t->get_host(instance)->get_name()});
     });
 }
 
 void JobTracer::log_event(EventType type, double time, std::vector<std::string> message) {
-    std::string key = "";
+    if (type == JobRequest) {
+        int cant = stoi(message[1]);
+        jobs_[message[0]] =
+            JobData{.job_id = count++, .resource_cant = cant, .submission_time = time};
+    } else if (type == JobStart) {
+        jobs_[message[0]].start_time = time;
+    } else if (type == JobEnd) {
+        jobs_[message[0]].finish_time = time;
+        JobData *j = &jobs_[message[0]];
 
-    std::stringstream ss;
+        std::stringstream ss;
 
-    if (type == TaskRequest) {
-        req_[key].push_back(time);
-    } else if (type == TaskStart) {
-        start_[key].push_back(time);
-    } else if (type == TaskEnd) {
         auto hosts = sg4::Engine::get_instance()->get_all_hosts();
-        auto it = std::find(hosts.begin(), hosts.end(), sg4::Host::by_name(message[3]));
+        auto it = std::find(hosts.begin(), hosts.end(), sg4::Host::by_name(message[1]));
         auto index = std::distance(hosts.begin(), it);
 
-        XBT_INFO("Task %s%s ENDED - %lf %lf", message[0].c_str(), message[1].c_str(),
-                 start_[key].front(), time);
+        double execution = j->finish_time - j->start_time;
+        double turnaround = j->finish_time - j->submission_time;
 
-        ss << message[0] + "_" + message[1] + "_" + message[2] << ","; // job_id
-        ss << "w0" << ",";                                             // workload FIX
-        ss << "Low" << ",";                                            // profile FIX
-        ss << req_[key].front() << ",";                                // submission time
-        ss << "2" << ",";                                     // requested number of resources FIX
-        ss << req_[key].front() << ",";                       // requested time FIX
-        ss << "1" << ",";                                     // success FIX
-        ss << "COMPLETED_SUCCESSFULLY" << ",";                // final state FIX
-        ss << start_[key].front() << ",";                     // start_time
-        ss << time - start_[key].front() << ",";              // execution_time
-        ss << time << ",";                                    // finish_time
-        ss << start_[key].front() - req_[key].front() << ","; // waiting_time
-        ss << time - req_[key].front() << ",";                // turnaround_time
-        ss << (time - req_[key].front()) / (time - start_[key].front()) << ","; // stretch
-        ss << std::to_string(index) << ",";          // allocated_resources FIX
-        ss << "0" << ",";          // consumed energy FIX
-        ss << "\"\"" << std::endl; // metadata FIX
+        // ss << key << ",";                            // job_id
+        ss << j->job_id << ",";
+        ss << "w0" << ",";                                // workload FIX
+        ss << "Low" << ",";                               // profile FIX
+        ss << j->submission_time << ",";                  // submission time
+        ss << j->resource_cant << ",";                    // requested number of resources FIX
+        ss << j->finish_time - j->submission_time << ","; // requested time FIX
+        ss << "1" << ",";                                 // success FIX
+        ss << "COMPLETED_SUCCESSFULLY" << ",";            // final state FIX
+        ss << j->start_time << ",";                       // start_time
+        ss << execution << ",";                           // execution_time
+        ss << j->finish_time << ",";                      // finish_time
+        ss << j->start_time - j->submission_time << ",";  // waiting_time
+        ss << turnaround << ",";                          // turnaround_time
+        ss << turnaround / execution << ",";              // stretch
+        ss << std::to_string(index) << ",";               // allocated_resources FIX
+        ss << "0" << ",";                                 // consumed energy FIX
+        ss << "\"\"" << std::endl;                        // metadata FIX
 
         events.push_back(ss.str());
-
-        req_[key].pop_front();
-        start_[key].pop_front();
+        jobs_.erase(message[0]);
     }
 }
 

@@ -28,8 +28,8 @@ class TestSpout : public es::ISpout {
             srand(time(NULL));
 
             for (int i = 0; i < 10; ++i) {
-                int wait = rand() % 10;
-                int cant = rand() % 100;
+                int wait = rand() % 3;
+                int cant = rand() % 20;
 
                 sg4::this_actor::sleep_for(wait);
                 src_->enqueue_firings(cant, "instance_0");
@@ -45,8 +45,8 @@ int main(int argc, char **argv) {
 
     w.add_scheduler(new RoundRobin());
     
-    w.add_job("A", 10e12, 1, 2);
-    w.add_job("B", 10e12, 4, 1);
+    w.add_job("A", 10e6, 1, 1);
+    w.add_job("B", 10e6, 4, 2);
     w.add_link("A", "B", 10e9, new es::ShuffleGrouping("Grouping"));
     w.add_spout(new TestSpout(), "A");
 

@@ -5,7 +5,7 @@
 #include <vector>
 
 namespace estresim {
-enum EventType { TaskRequest, TaskStart, TaskEnd, CommStart, CommEnd };
+enum EventType { JobRequest, JobStart, JobEnd, CommStart, CommEnd };
 std::string event_to_string(EventType type);
 
 class ITracer {
@@ -25,6 +25,14 @@ class TaskTracer : public ITracer {
     std::vector<std::string> events;
 };
 
+struct JobData {
+    int job_id;
+    int resource_cant;
+    double submission_time;
+    double start_time;
+    double finish_time;
+};
+
 class JobTracer : public ITracer {
   public:
     explicit JobTracer();
@@ -32,11 +40,12 @@ class JobTracer : public ITracer {
     void save(const std::string &filename) override;
 
   private:
+    int count = 0;
+
     std::vector<std::string> fields;
     std::vector<std::string> events;
 
-    std::map<std::string ,std::deque<double>> req_;
-    std::map<std::string ,std::deque<double>> start_;
+    std::map<std::string, JobData> jobs_;
 };
 
 } // namespace estresim

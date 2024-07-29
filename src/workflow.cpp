@@ -61,6 +61,14 @@ void Workflow::run() {
     // xbt_assert(this->generator != nullptr, "Must specify a generator");
     xbt_assert(this->sched_ != nullptr, "Must specify a scheduler");
 
+    for (auto &job : jobs_) {
+        for (int i = 0; i < job.second->get_instance_count(); i++) {
+            std::string instance = "instance_" + std::to_string(i);
+            XBT_INFO("> %s %s == %s", job.second->get_cname(), instance.c_str(), job.second->get_host(instance)->get_cname());
+        }
+    }
+
+
     XBT_INFO("SIMULATION STARTED");
     while (true) {
         if (!this->running_spouts) {
