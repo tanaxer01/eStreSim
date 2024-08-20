@@ -1,6 +1,5 @@
-#include <simgrid/s4u.hpp>
 #include <estresim.hpp>
-#include <iostream>
+#include <simgrid/s4u.hpp>
 #include <time.h>
 
 XBT_LOG_NEW_DEFAULT_CATEGORY(test01, "Messages specific for this example");
@@ -22,32 +21,33 @@ class RoundRobin : public es::IScheduler {
 };
 
 class TestSpout : public es::ISpout {
-    public:
-        std::string type() const override { return "TestSpout"; }
-        void generate() const override {
-            srand(time(NULL));
+  public:
+    std::string type() const override { return "TestSpout"; }
+    void generate() const override {
+        srand(time(NULL));
 
-            for (int i = 0; i < 10; ++i) {
-                int wait = rand() % 3;
-                int cant = rand() % 20;
+        for (int i = 0; i < 10; ++i) {
+            int wait = rand() % 10;
+            int cant = rand() % 10;
 
-                sg4::this_actor::sleep_for(wait);
-                src_->enqueue_firings(cant, "instance_0");
-            }
+            sg4::this_actor::sleep_for(wait);
+            src_->enqueue_firings(cant, "instance_0");
         }
+    }
 };
 
 int main(int argc, char **argv) {
     sg4::Engine e(&argc, argv);
-    e.load_platform(argv[1]);
 
-    es::Workflow w = es::Workflow("Test workflow");
+    auto w = es::Workflow("Name", argv[1], new RoundRobin());
 
-    w.add_scheduler(new RoundRobin());
-    
     w.add_job("A", 10e6, 1, 1);
-    w.add_job("B", 10e6, 4, 2);
-    w.add_link("A", "B", 10e9, new es::ShuffleGrouping("Grouping"));
+    w.add_job("B", 10e9, 2, 1);
+    w.add_job("C", 10e6, 1, 1);
+
+    w.add_link("A", "B", 10, new es::ShuffleGrouping("Grouping"));
+    w.add_link("B", "C", 10, new es::ShuffleGrouping("Grouping"));
+
     w.add_spout(new TestSpout(), "A");
 
     es::JobTracer jt = es::JobTracer();

@@ -88,23 +88,21 @@ void TaskTracer::log_event(EventType type, double time, std::vector<std::string>
 void TaskTracer::save(const std::string &filename) {}
 
 JobTracer::JobTracer() {
-    fields = {"job_id",
-              "workload_name",
-              "profile",
-              "submission_time",
-              "requested_number_of_resources",
-              "requested_time",
-              "success",
-              "final_state",
-              "starting_time",
-              "execution_time",
-              "finish_time",
-              "waiting_time",
-              "turnaround_time",
-              "stretch",
-              "allocated_resources",
-              "consumed_energy"
-              "metadata"};
+    fields = {
+       "jobID",
+       "workload_name",
+       "submission_time",
+       "requested_number_of_resources",
+       "requested_time",
+       "success",
+       "starting_time",
+       "execution_time",
+       "finish_time",
+       "waiting_time",
+       "turnaround_time",
+       "stretch",
+       "allocated_resources"
+    };
 
     Job::on_request_cb([this](Job *t, std::string instance, int n) {
         std::string key = t->get_name() + instance.substr(9);
@@ -145,6 +143,21 @@ void JobTracer::log_event(EventType type, double time, std::vector<std::string> 
         double execution = j->finish_time - j->start_time;
         double turnaround = j->finish_time - j->submission_time;
 
+        ss << j->job_id << ","; // jobID
+        ss << "w0" << ","; // workload
+        ss << j->submission_time << ","; // submission_time 
+        ss << j->resource_cant << ","; // requested_number_of_resources
+        ss << execution << ","; // requested_time
+        ss << "COMPLETED_SUCCESSFULLY" << ","; // success
+        ss << j->start_time << ","; // starting_time
+        ss << execution << ","; // execution_time
+        ss << j->finish_time << ","; // finish_time
+        ss << j->start_time - j->submission_time << ","; // waiting_time
+        ss << turnaround << ","; // turnaround_time
+        ss << turnaround / execution << ","; // stretch
+        ss << std::to_string(index) << "\n"; // allocated_resources
+
+        /*
         // ss << key << ",";                            // job_id
         ss << j->job_id << ",";
         ss << "w0" << ",";                                // workload FIX
@@ -163,6 +176,7 @@ void JobTracer::log_event(EventType type, double time, std::vector<std::string> 
         ss << std::to_string(index) << ",";               // allocated_resources FIX
         ss << "0" << ",";                                 // consumed energy FIX
         ss << "\"\"" << std::endl;                        // metadata FIX
+        */
 
         events.push_back(ss.str());
         jobs_.erase(message[0]);

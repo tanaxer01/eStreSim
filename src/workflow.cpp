@@ -48,7 +48,7 @@ void Workflow::add_spout(ISpout *spout, std::string job) {
 
     spout->set_source(jobs_[job]);
     auto generator = sg4::Actor::create("test", jobs_[job]->get_host("instance_0"),
-                                        [this, spout]() { spout->generate(); });
+                                        [spout]() { spout->generate(); });
     generator->on_exit([this](bool failed) { running_spouts--; });
 }
 

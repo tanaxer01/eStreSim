@@ -7,13 +7,6 @@ project('estresim', 'cpp',
 
 boost_dep   = dependency('boost')
 
-# zeromq  = dependency('libzmq')
-# json = dependency('nlohmann_json')
-
-# py = import('python').find_installation(pure: false)
-# pybind11_dep = dependency('pybind11')
-
-
 # simgrid_dep = dependency('simgrid', required : false)
 # if not simgrid_dep.found()
 simgrid_project = subproject('simgrid')
@@ -36,6 +29,18 @@ estresim_lib = library('estresim',
   dependencies: [simgrid_dep, boost_dep]
 )
 
+py = import('python').find_installation(pure: false)
+pybind11_dep = dependency('pybind11')
+
+if pybind11_dep.found()
+   py.extension_module('estresim',
+     ['src/bindings/python/estresim_python.cpp'],
+     include_directories:  include_directories('include'),
+     dependencies : [pybind11_dep, simgrid_dep, boost_dep],
+     install: true,
+     link_with: estresim_lib)
+endif
+
 
 executable('test01',
   'tests/test01.cpp',
@@ -43,10 +48,3 @@ executable('test01',
   dependencies: simgrid_dep,
   link_with: estresim_lib
 )
-
-# py.extension_module('estresim',
-#   ['src/bindings/python/estresim_python.cpp'],
-#   include_directories:  include_directories('include'),
-#   install: true,
-#   link_with: estresim_lib,
-#   dependencies : [pybind11_dep, simgrid_dep])

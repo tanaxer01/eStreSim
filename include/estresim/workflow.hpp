@@ -13,6 +13,10 @@ namespace estresim {
 class XBT_PUBLIC Workflow {
   public:
     Workflow(std::string name) : name_(name) {}
+    Workflow(std::string name, std::string platform, IScheduler *sched) : name_(name), sched_(sched)  {
+        auto e = simgrid::s4u::Engine::get_instance();
+        e->load_platform(platform);
+    }
 
     /** @brief Adds a new job to the dag and configures it parallelism degree */
     void add_job(std::string name, float flops, int instances = 1, int paralellism_degree = 1);

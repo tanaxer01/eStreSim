@@ -1,8 +1,7 @@
 build
 .cache
 env
-
+.ipynb_checkpoints
 
 subprojects/*
 !subprojects/*.wrap
-
