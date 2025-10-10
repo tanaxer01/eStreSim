@@ -27,100 +27,42 @@ std::string event_to_string(EventType type) {
     }
 }
 
-TaskTracer::TaskTracer() {
-    /*
-    Job::on_start_cb([this](Job *t, std::string instance) {
-        this->log_event(EventType::JobStart, simgrid::s4u::Engine::get_clock(),
-                        std::vector<std::string>{t->get_name(), instance,
-                                                 t->get_host(instance)->get_name(),
-                                                 std::to_string(t->get_running_count(instance))});
-    });
-
-    Job::on_completion_cb([this](Job *t, std::string instance) {
-        this->log_event(EventType::JobEnd, simgrid::s4u::Engine::get_clock(),
-                        std::vector<std::string>{t->get_name(), instance,
-                                                 t->get_host(instance)->get_name(),
-                                                 std::to_string(t->get_running_count(instance))});
-    });
-    */
-}
-
-void TaskTracer::log_event(EventType type, double time, std::vector<std::string> message) {
-    std::string key = message[0] + ";" + message[1] + ";" + message[2] + ";" + message[3];
-
-    /*
-    XBT_INFO("[%s] %s", event_to_string(type).c_str(), key.c_str());
-
-    if (type == EventType::JobStart) {
-        xbt_assert(this->started.find(key) == this->started.end(),
-                   "JobStart callback called again before JobEnd for %s", key.c_str());
-        this->started[key] = time;
-    } else {
-        xbt_assert(this->started.find(key) != this->started.end(),
-                   "JobEnd callback called before JobStart for %s", key.c_str());
-
-        // this->events.push_back(ss.str());
-        this->started.erase(key);
-    }
-    */
-
-    /*
-    if (type == EventType::JobStart) {
-        xbt_assert(this->started.find(key) == this->started.end(),
-                   "JobStart callback called before JobEnd for %s", key.c_str());
-        this->started[key] = time;
-        return;
-    }
-    */
-
-    // xbt_assert(this->started.find(key) != this->started.end(), "JobEnd callback called before
-    // JobStart for %s", key.c_str());
-    /*
-    std::stringstream ss;
-    ss <<message[0] <<"," <<message[1] <<"," <<message[2] <<"," <<this->started[key] <<"," <<time
-    <<"," <<(time - this->started[key]) <<"\n";
-
-    this->events.push_back(ss.str());
-    this->started.erase(key);
-    */
-}
-
-void TaskTracer::save(const std::string &filename) {}
-
 JobTracer::JobTracer() {
-    fields = {
-       "jobID",
-       "workload_name",
-       "submission_time",
-       "requested_number_of_resources",
-       "requested_time",
-       "success",
-       "starting_time",
-       "execution_time",
-       "finish_time",
-       "waiting_time",
-       "turnaround_time",
-       "stretch",
-       "allocated_resources"
-    };
+    fields = {"jobID",
+              "workload_name",
+              "submission_time",
+              "requested_number_of_resources",
+              "requested_time",
+              "success",
+              "starting_time",
+              "execution_time",
+              "finish_time",
+              "waiting_time",
+              "turnaround_time",
+              "stretch",
+              "allocated_resources"};
 
-    Job::on_request_cb([this](Job *t, std::string instance, int n) {
-        std::string key = t->get_name() + instance.substr(9);
-        // for (int i = 0; i < n; i++)
-        log_event(EventType::JobRequest, sg4::Engine::get_clock(),
-                  std::vector<std::string>{key, std::to_string(n)});
-    });
-
-    Job::on_start_cb([this](Job *t, std::string instance) {
-        std::string key = t->get_name() + instance.substr(9);
-        log_event(EventType::JobStart, sg4::Engine::get_clock(), std::vector<std::string>{key});
-    });
-
-    Job::on_completion_cb([this](Job *t, std::string instance) {
-        std::string key = t->get_name() + instance.substr(9);
-        log_event(EventType::JobEnd, sg4::Engine::get_clock(),
-                  std::vector<std::string>{key, t->get_host(instance)->get_name()});
-    });
+    // Job::on_request_cb([this](Job *t, std::string instance, int n) {
+    //     std::string key = t->get_name() + instance.substr(9);
+    //     // for (int i = 0; i < n; i++)
+    //     log_event(EventType::JobRequest, sg4::Engine::get_clock(),
+    //               std::vector<std::string>{key, std::to_string(n)});
+    // });
+    //
+    // Job::on_start_cb([this](Job *t, std::string instance) {
+    //     XBT_INFO(">> %s started on %s", t->get_cname(), t->get_host(instance)->get_cname());
+    //
+    //     std::string key = t->get_name() + instance.substr(9);
+    //     log_event(EventType::JobStart, sg4::Engine::get_clock(), std::vector<std::string>{key});
+    // });
+    //
+    // Job::on_completion_cb([this](Job *t, std::string instance) {
+    //     XBT_INFO("<< %s ended on %s", t->get_cname(), t->get_host(instance)->get_cname());
+    //
+    //     std::string key = t->get_name() + instance.substr(9);
+    //     log_event(EventType::JobEnd, sg4::Engine::get_clock(),
+    //               std::vector<std::string>{key, t->get_host(instance)->get_name()});
+    // });
 }
 
 void JobTracer::log_event(EventType type, double time, std::vector<std::string> message) {
@@ -143,19 +85,19 @@ void JobTracer::log_event(EventType type, double time, std::vector<std::string> 
         double execution = j->finish_time - j->start_time;
         double turnaround = j->finish_time - j->submission_time;
 
-        ss << j->job_id << ","; // jobID
-        ss << "w0" << ","; // workload
-        ss << j->submission_time << ","; // submission_time 
-        ss << j->resource_cant << ","; // requested_number_of_resources
-        ss << execution << ","; // requested_time
-        ss << "COMPLETED_SUCCESSFULLY" << ","; // success
-        ss << j->start_time << ","; // starting_time
-        ss << execution << ","; // execution_time
-        ss << j->finish_time << ","; // finish_time
+        ss << j->job_id << ",";                          // jobID
+        ss << "w0" << ",";                               // workload
+        ss << j->submission_time << ",";                 // submission_time
+        ss << j->resource_cant << ",";                   // requested_number_of_resources
+        ss << execution << ",";                          // requested_time
+        ss << "COMPLETED_SUCCESSFULLY" << ",";           // success
+        ss << j->start_time << ",";                      // starting_time
+        ss << execution << ",";                          // execution_time
+        ss << j->finish_time << ",";                     // finish_time
         ss << j->start_time - j->submission_time << ","; // waiting_time
-        ss << turnaround << ","; // turnaround_time
-        ss << turnaround / execution << ","; // stretch
-        ss << std::to_string(index) << "\n"; // allocated_resources
+        ss << turnaround << ",";                         // turnaround_time
+        ss << turnaround / execution << ",";             // stretch
+        ss << std::to_string(index) << "\n";             // allocated_resources
 
         /*
         // ss << key << ",";                            // job_id

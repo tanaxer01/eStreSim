@@ -16,8 +16,6 @@ simgrid_dep = simgrid_project.get_variable('simgrid_dep')
 source_files = [
   'src/job.cpp',
   'src/grouping.cpp',
-  'src/scheduler.cpp',
-  'src/spout.cpp',
   'src/workflow.cpp',
   'src/tracer.cpp',
 ]

@@ -1,6 +1,7 @@
+#ifndef ESTRESIM_TRACER_HPP
+#define ESTRESIM_TRACER_HPP
 
 #include <map>
-#include <deque>
 #include <string>
 #include <vector>
 
@@ -14,17 +15,6 @@ class ITracer {
     virtual void save(const std::string &filename) = 0;
 };
 
-class TaskTracer : public ITracer {
-  public:
-    explicit TaskTracer();
-    void log_event(EventType type, double time, const std::vector<std::string> message) override;
-    void save(const std::string &filename) override;
-
-  private:
-    std::map<std::string, double> started;
-    std::vector<std::string> events;
-};
-
 struct JobData {
     int job_id;
     int resource_cant;
@@ -36,6 +26,7 @@ struct JobData {
 class JobTracer : public ITracer {
   public:
     explicit JobTracer();
+
     void log_event(EventType type, double time, const std::vector<std::string> message) override;
     void save(const std::string &filename) override;
 
@@ -49,3 +40,5 @@ class JobTracer : public ITracer {
 };
 
 } // namespace estresim
+
+#endif

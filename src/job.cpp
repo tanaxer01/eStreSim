@@ -2,8 +2,8 @@
 #include <simgrid/s4u/Exec.hpp>
 #include <simgrid/simcall.hpp>
 
-#include <estresim/job.hpp>
 #include <estresim/grouping.hpp>
+#include <estresim/job.hpp>
 
 // #include "include/job.hpp"
 // #include "include/grouping.hpp"
@@ -23,7 +23,7 @@ JobPtr Job::init(const std::string &name) { return JobPtr(new Job(name)); }
 //  * @brief Smart Constructor.
 //  */
 JobPtr Job::init(const std::string &name, double flops, sg4::Host *host) {
-    return init(name)->set_flops(flops)->set_host(host);
+    return init(name)->set_amount(flops)->set_host(host);
 }
 
 /** @param name The new name to set. */
@@ -32,7 +32,7 @@ void Job::set_name(std::string name) { name_ = name; }
 /** @param flops The amount to set.
  *  @param instance The instance to set the amount of flops to.
  * */
-JobPtr Job::set_flops(double flops, std::string instance) {
+JobPtr Job::set_amount(double flops, std::string instance) {
     simgrid::kernel::actor::simcall_answered(
         [this, flops, &instance] { amount_[instance] = flops; });
     return this;
@@ -123,7 +123,7 @@ void Job::remove_instances(int n) {
 }
 
 void Job::add_succesor(IGrouping *g) {
-    simgrid::kernel::actor::simcall_answered([this, g]  {
+    simgrid::kernel::actor::simcall_answered([this, g] {
         successors_.insert(g);
         for (auto &[key, val] : g->get_destination()->predecessors_)
             val[g->get_source()] = 0;
@@ -182,7 +182,7 @@ void Job::fire(const std::string &instance) {
 
     auto exec = sg4::Exec::init()
                     ->set_name(get_name() + "_" + instance)
-                    ->set_flops_amount(get_flops(instance))
+                    ->set_flops_amount(get_amount(instance))
                     ->set_host(host_[instance]);
     exec->start();
     exec->on_this_completion_cb([this, instance](sg4::Exec const &) { complete(instance); });
@@ -202,7 +202,7 @@ void Job::complete(const std::string &instance) {
     on_this_completion(this, instance);
 
     for (auto const &t : successors_)
-       t->receive(instance);
+        t->receive(instance);
 
     if (ready_to_run(instance))
         fire(instance);

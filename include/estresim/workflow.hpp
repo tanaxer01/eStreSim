@@ -1,8 +1,10 @@
 #ifndef ESTRESIM_WORKFLOW_HPP
 #define ESTRESIM_WORKFLOW_HPP
 
-#include <estresim/job.hpp>
 #include <estresim/grouping.hpp>
+#include <estresim/job.hpp>
+#include <estresim/spout.hpp>
+#include <simgrid/s4u/Engine.hpp>
 
 #include <map>
 #include <string>
@@ -13,7 +15,8 @@ namespace estresim {
 class XBT_PUBLIC Workflow {
   public:
     Workflow(std::string name) : name_(name) {}
-    Workflow(std::string name, std::string platform, IScheduler *sched) : name_(name), sched_(sched)  {
+    Workflow(std::string name, std::string platform, IScheduler *sched)
+        : name_(name), sched_(sched) {
         auto e = simgrid::s4u::Engine::get_instance();
         e->load_platform(platform);
     }
@@ -26,18 +29,22 @@ class XBT_PUBLIC Workflow {
     void add_spout(ISpout *spout, std::string task);
     /** @brief Defines the scheduler with which task hosts will be chosen */
     void add_scheduler(IScheduler *sched);
-
-    void add_tracer();
+    /** @brief Adds a tracer to the simulation */
+    void add_tracer(std::string name, ITracer *tracer);
+    /** @brief Calls the IScheduler and assigns hosts to jobs */
+    void schedule();
     /** @brief Calls the sg4::Engine and starts the simulation */
     void run();
 
-  private:
+    // private:
+  public: // temp
     std::string name_;
-    int running_spouts = 0;
 
     IScheduler *sched_;
 
     std::map<std::string, JobPtr> jobs_;
+    std::map<std::string, ISpout *> spouts_;
+    std::map<std::string, ITracer *> tracers_;
     std::map<std::string, IGrouping *> links_;
 };
 

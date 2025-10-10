@@ -21,6 +21,10 @@ class IScheduler;
 
 class ISpout;
 
+class ITracer;
+
+class Workflow;
+
 } // namespace estresim
 }
 

@@ -1,6 +1,8 @@
 
+#include <estresim.hpp>
 #include <estresim/forward.h>
 
+#include <estresim/job.hpp>
 #include <estresim/scheduler.hpp>
 #include <estresim/spout.hpp>
 #include <estresim/workflow.hpp>
@@ -10,25 +12,23 @@ XBT_LOG_NEW_DEFAULT_CATEGORY(workflow, "workflow logs");
 namespace estresim {
 
 void Workflow::add_job(std::string name, float amount, int instances, int parallelism_degree) {
-    xbt_assert(sched_ != nullptr, "Must specify a scheduler");
-    xbt_assert(jobs_.find(name) == jobs_.end(), "Job already exists");
+    xbt_assert(sched_ != nullptr, "Must specify a scheduler to add a job");
+    xbt_assert(jobs_.find(name) == jobs_.end(), "Job '%s' already exists", name.c_str());
 
-    jobs_[name] = Job::init(name, amount, sched_->schedule());
+    jobs_[name] = Job::init(name)->set_amount(amount);
     jobs_[name]->set_parallelism_degree(parallelism_degree);
 
     if (instances == 1)
         return;
 
     jobs_[name]->add_instances(instances - 1);
-    for (int i = 1; i < instances; i++)
-        jobs_[name]->set_host(sched_->schedule(), "instance_" + std::to_string(i));
 }
 
 void Workflow::add_link(std::string src, std::string dst, float amount, IGrouping *grouping) {
     std::string key = src + "_" + dst;
 
-    xbt_assert(jobs_.find(src) != jobs_.end(), "Source task not found");
-    xbt_assert(jobs_.find(dst) != jobs_.end(), "Destination task not found");
+    xbt_assert(jobs_.find(src) != jobs_.end(), "Source job not found");
+    xbt_assert(jobs_.find(dst) != jobs_.end(), "Destination job not found");
     xbt_assert(links_.find(key) == links_.end(), "Link already exists");
 
     auto src_job = this->jobs_[src];
@@ -44,12 +44,9 @@ void Workflow::add_link(std::string src, std::string dst, float amount, IGroupin
 /** @param spout One of the spouts that will generate traffic into the simulation  */
 void Workflow::add_spout(ISpout *spout, std::string job) {
     xbt_assert(jobs_.find(job) != jobs_.end(), "Source task not found");
-    running_spouts += 1;
 
     spout->set_source(jobs_[job]);
-    auto generator = sg4::Actor::create("test", jobs_[job]->get_host("instance_0"),
-                                        [spout]() { spout->generate(); });
-    generator->on_exit([this](bool failed) { running_spouts--; });
+    spouts_[job + "_spout"] = spout;
 }
 
 /** @param sched This is the scheduler that is going to be used during the simulation.
@@ -57,38 +54,81 @@ void Workflow::add_spout(ISpout *spout, std::string job) {
  */
 void Workflow::add_scheduler(IScheduler *sched) { this->sched_ = sched; }
 
-void Workflow::run() {
-    // xbt_assert(this->generator != nullptr, "Must specify a generator");
-    xbt_assert(this->sched_ != nullptr, "Must specify a scheduler");
+void Workflow::add_tracer(std::string name, ITracer *tracer) {
+    xbt_assert(tracers_.find(name) == tracers_.end(), "Tracer '%s' already exists", name.c_str());
+    tracers_[name] = tracer;
+}
 
-    for (auto &job : jobs_) {
-        for (int i = 0; i < job.second->get_instance_count(); i++) {
-            std::string instance = "instance_" + std::to_string(i);
-            XBT_INFO("> %s %s == %s", job.second->get_cname(), instance.c_str(), job.second->get_host(instance)->get_cname());
-        }
-    }
-
-
-    XBT_INFO("SIMULATION STARTED");
+void scheduler(Workflow *wf) {
+    int total = 0;
     while (true) {
-        if (!this->running_spouts) {
-            sg4::Engine::get_instance()->run();
+        total = wf->spouts_.size();
+        for (auto &[name, spout] : wf->spouts_)
+            total -= (int)spout->has_ended;
+
+        for (auto &[name, job] : wf->jobs_)
+            total += job->get_queued_firings("instance_0");
+
+        if (total == 0)
             break;
-        }
 
-        if (sched_->should_schedule()) {
-            /*
-            XBT_INFO("RESCHEDULE");
-            for (auto &job : jobs_) {
-                for (int i = 0; i < job.second->get_instance_count(); i++)
-                    job.second->set_host(sched_->schedule(), "instance_" + std::to_string(i));
-            } */
-        }
+        if (wf->sched_->should_schedule())
+            wf->sched_->schedule(wf);
 
-        // TODO: Here we should check if we need to reschedule?
-        sg4::Engine::get_instance()->run_until(sg4::Engine::get_clock() + 1);
+        sg4::this_actor::sleep_for(10);
     }
-    XBT_INFO("SIMULATION ENDED");
+}
+
+void Workflow::schedule() {
+    xbt_assert(this->sched_ != nullptr, "Called schedule without a scheduler assigned");
+    this->sched_->schedule(this);
+}
+
+void Workflow::run() {
+    XBT_DEBUG("Workflow '%s' starting", name_.c_str());
+
+    sg4::Engine::get_instance()->on_simulation_start_cb([]() { XBT_DEBUG("SIMULATION STARTED"); });
+    sg4::Engine::get_instance()->on_simulation_end_cb([]() { XBT_DEBUG("SIMULATION ENDED"); });
+
+    // TODO - Handle user defined tracer message
+    Job::on_request_cb([this](Job *t, std::string instance, int n) {
+        std::string key = t->get_name() + instance.substr(9);
+        for (auto &[name, tracer] : tracers_)
+            tracer->log_event(EventType::JobRequest, sg4::Engine::get_clock(),
+                              std::vector<std::string>{key, std::to_string(n)});
+    });
+
+    Job::on_start_cb([this](Job *t, std::string instance) {
+        std::string key = t->get_name() + instance.substr(9);
+        for (auto &[name, tracer] : tracers_)
+            tracer->log_event(EventType::JobStart, sg4::Engine::get_clock(),
+                              std::vector<std::string>{key});
+    });
+
+    Job::on_completion_cb([this](Job *t, std::string instance) {
+        std::string key = t->get_name() + instance.substr(9);
+        for (auto &[name, tracer] : tracers_)
+            tracer->log_event(EventType::JobEnd, sg4::Engine::get_clock(),
+                              std::vector<std::string>{key, t->get_host(instance)->get_name()});
+    });
+
+    // 1. schedule jobs
+    this->schedule();
+
+    // 2. allocate spouts actors
+    for (auto &[name, spout] : spouts_)
+        spout->start();
+
+    // 3. allocate scheduler actor
+    // TODO: How to choose which host runs the scheduler?
+    // TODO: Allow to change the step time used
+    sg4::Engine::get_instance()->get_all_hosts().front()->add_actor("Scheduler", scheduler, this);
+
+    // 4. run the simulation
+    sg4::Engine::get_instance()->run();
+
+    for (auto &[name, tracer] : tracers_)
+        tracer->save(name + ".csv");
 }
 
 } // namespace estresim
